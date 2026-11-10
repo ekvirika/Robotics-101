@@ -1,0 +1,8 @@
+$ dora validate dataflow.yml        # with "sendr/message" instead of "sender/message"
+Validating dataflow.yml...
+
+[ERROR]
+wiring check failed
+
+Caused by:
+    source node `sendr` mapped to input `receiver/message` does not exist

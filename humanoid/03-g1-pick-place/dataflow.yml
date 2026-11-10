@@ -1,0 +1,91 @@
+# Lesson 3: the full Unitree G1 picks up a bottle and puts it on another table.
+#
+#             base_pose, bottle_pose (50 Hz)
+#        ┌───────────────────────────────────────────┐
+#        │                                            ▼
+#      sim ──low_state (500 Hz)──▶ locomotion ◀──cmd_vel──── task
+#       ▲  ╲                         │   └──standing──────────▶ ▲
+#       │   ╲──low_state──▶ arm ◀────┼──arm_command────────────┤
+#       │                   │  └─────┼──arm_status─────────────┘
+#       └──joint commands───┴────────┘
+#
+# Run from the repository root:  ./run.sh g1-pick-place
+
+strict_types: true # a type mismatch between two nodes is an error
+
+env: # given to every node
+  PYTHONPATH: . # so every node can `import g1` (the robot software library)
+
+nodes:
+  - id: sim
+    name: robot + room
+    description: MuJoCo physics at 500 Hz, the G1's motor drivers and sensors, 3D window. On hardware this is the G1 itself.
+    path: uv
+    args: run --no-sync mjpython -u nodes/sim.py
+    inputs:
+      tick: dora/timer/millis/2 # one physics step every 2 ms
+      lower_body_cmd: locomotion/joint_command
+      upper_body_cmd: arm/joint_command
+    outputs:
+      - low_state # joint angles and speeds, IMU
+      - base_pose # where the robot is (on hardware: localization)
+      - bottle_pose # where the bottle is (on hardware: camera + detector)
+    output_types:
+      low_state: std/core/v1/Float64
+      base_pose: std/core/v1/Float64
+      bottle_pose: std/core/v1/Float64
+    env:
+      SCENE: robot/scene.xml
+
+  - id: locomotion
+    description: walks with Unitree's trained policy, or stands still and balances
+    path: uv
+    args: run --no-sync python -u nodes/locomotion.py
+    inputs:
+      low_state: sim/low_state
+      cmd_vel: task/cmd_vel
+    outputs:
+      - joint_command # legs + waist
+      - standing
+    output_types:
+      joint_command: std/core/v1/Float64
+      standing: std/core/v1/Float64
+    env:
+      POLICY: policies/g1_walk.onnx
+
+  - id: arm
+    description: moves the right hand (IK, smooth paths, gravity compensation) and opens/closes it
+    path: uv
+    args: run --no-sync python -u nodes/arm.py
+    inputs:
+      low_state: sim/low_state
+      arm_command: task/arm_command
+    outputs:
+      - joint_command # arms + hands
+      - arm_status
+    output_types:
+      joint_command: std/core/v1/Float64
+      arm_status: std/core/v1/Float64
+    env:
+      ROBOT: robot/g1_with_hands.xml
+
+  - id: task
+    description: the mission, step by step (g1/mission.py)
+    path: uv
+    args: run --no-sync python -u nodes/task.py
+    inputs:
+      base_pose: sim/base_pose
+      bottle_pose: sim/bottle_pose
+      standing: locomotion/standing
+      arm_status: arm/arm_status
+    outputs:
+      - cmd_vel
+      - arm_command
+    output_types:
+      cmd_vel: std/core/v1/Float64
+      arm_command: std/core/v1/Float64
+    env: # the "map": where things are in the room (robot/scene.xml)
+      PICK_HEADING_DEG: 0 # face +x at table A
+      PLACE_POINT: "1.0,-1.52" # the green mark on table B (x, y)
+      PLACE_HEADING_DEG: -90 # face -y at table B
+      TABLE_HEIGHT: 0.80

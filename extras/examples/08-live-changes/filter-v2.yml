@@ -1,0 +1,10 @@
+id: filter
+path: uv
+args: run --no-sync python -u nodes/filter.py
+inputs:
+  value: sensor/value
+outputs:
+  - value
+env:
+  FILTER_VERSION: v2
+  THRESHOLD: "20"

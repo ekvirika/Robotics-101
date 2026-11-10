@@ -1,0 +1,7 @@
+$ ./run.sh first-change
+15:29:43 INFO   checker: daemon node is ready
+15:29:43  receiver          INFO  Received message: [0]
+15:29:43  checker           INFO  Message #0 is even, doubled it is 0
+15:29:43  receiver          INFO  Received transformed: [{'doubled': 0, 'description': 'Message #0', 'is_even': True}]
+15:29:43  receiver          INFO  Received message: [1]
+...

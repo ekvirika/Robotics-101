@@ -1,0 +1,19 @@
+$ dora up
+$ dora start dataflow.yml --name yolo --uv --debug --detach
+
+$ dora list
+UUID                                  Name  Status   Nodes  CPU     Memory
+01a1b09a-51b7-74dd-ace1-0bbfb1809c73  yolo  Running  3      125.8%  1.4 GB
+
+$ dora node list -d yolo
+NODE              STATUS   PID    CPU     MEMORY  RESTARTS
+object_detection  Running  32968  113.5%  817 MB  0
+plot              Running  32975  11.6%   256 MB  0
+webcam            Running  32982  0.7%    355 MB  0
+
+$ dora topic echo -d yolo object_detection/bbox
+object_detection/bbox  data=[133.48,0.0,261.98,287.73,0.8868,0.0,  0.0,1.82,156.58,333.89,0.8636,0.0,  614.52,244.34,639.86,376.38,0.3705,0.0] metadata={"encoding":"bgr8","height":480,"width":640, ...}
+object_detection/bbox  data=[0.09,0.92,162.05,331.35,0.8759,0.0,  137.59,0.0,265.73,282.94,0.8154,0.0,  619.30,241.49,639.85,373.62,0.2722,0.0] metadata={...}
+
+$ dora stop --name yolo
+$ dora down

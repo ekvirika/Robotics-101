@@ -1,0 +1,30 @@
+nodes:
+  - id: driver
+    path: uv
+    args: run --no-sync python -u nodes/circle_driver.py
+    inputs:
+      tick: dora/timer/millis/100
+    outputs:
+      - cmd_vel
+
+  - id: cmd_bridge
+    ros2:
+      topic: /turtle1/cmd_vel
+      message_type: geometry_msgs/Twist
+      direction: publish
+    inputs:
+      cmd_vel: driver/cmd_vel
+
+  - id: pose_bridge
+    ros2:
+      topic: /turtle1/pose
+      message_type: turtlesim/Pose
+      direction: subscribe
+    outputs:
+      - pose
+
+  - id: printer
+    path: uv
+    args: run --no-sync python -u nodes/pose_printer.py
+    inputs:
+      pose: pose_bridge/pose

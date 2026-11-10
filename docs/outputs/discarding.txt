@@ -1,0 +1,4 @@
+$ dora logs yolo --node object_detection
+15:25:27 WARN   object_detection: Discarding event for input `image` due to queue size limit
+15:25:27 WARN   object_detection: Discarding event for input `image` due to queue size limit
+15:25:27 WARN   object_detection: Discarding event for input `image` due to queue size limit

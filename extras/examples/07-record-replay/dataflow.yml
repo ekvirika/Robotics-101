@@ -1,0 +1,32 @@
+nodes:
+  - id: camera
+    path: uv
+    args: run --no-sync python -u ../02-camera-pipeline/nodes/camera.py
+    inputs:
+      tick: dora/timer/millis/33
+    outputs:
+      - image
+    env:
+      PYTHONPATH: ../..
+      CAMERA_SOURCE: synthetic
+      IMAGE_WIDTH: 320
+      IMAGE_HEIGHT: 240
+
+  - id: detector
+    path: uv
+    args: run --no-sync python -u ../02-camera-pipeline/nodes/detector.py
+    inputs:
+      image: camera/image
+    outputs:
+      - boxes
+    env:
+      PYTHONPATH: ../..
+      DETECTOR: colour
+
+  - id: report
+    path: uv
+    args: run --no-sync python -u nodes/report.py
+    inputs:
+      boxes: detector/boxes
+    env:
+      PYTHONPATH: ../..

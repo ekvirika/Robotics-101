@@ -1,0 +1,3 @@
+#!/usr/bin/env bash
+# Module nodes look up `path` next to the module file, so they start Python through this script.
+exec uv run --no-sync python -u "$@"

@@ -1,0 +1,9 @@
+.venv/
+__pycache__/
+out/
+*.drec
+*.pt
+.DS_Store
+.dora/
+_work/
+.idea/

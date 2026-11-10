@@ -1,0 +1,8 @@
+$ ./run.sh fake-camera
+15:23:19 INFO   [dora]: dora daemon finished building nodes, spawning...
+15:23:45 INFO   plot: daemon node is ready
+15:23:58  object_detection  Creating new Ultralytics Settings v0.0.8 file ✅
+15:23:58 INFO   webcam: daemon node is ready
+15:24:09  object_detection  Downloading https://github.com/ultralytics/assets/releases/download/v8.4.0/yolov8n.pt to 'yolov8n.pt': 100% 6.2MB
+15:24:09 INFO   object_detection: daemon node is ready
+   (a window called "frame" opens: the street photo, moving slowly, with green boxes and labels)

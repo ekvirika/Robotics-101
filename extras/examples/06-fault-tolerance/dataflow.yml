@@ -1,0 +1,34 @@
+health_check_interval: 1.0
+
+nodes:
+  - id: sensor
+    path: uv
+    args: run --no-sync python -u nodes/flaky_sensor.py
+    inputs:
+      tick: dora/timer/millis/100
+    outputs:
+      - reading
+    restart_policy: on-failure
+    max_restarts: 5
+    restart_delay: 0.5
+    max_restart_delay: 4.0
+    env:
+      CRASH_AFTER: 30
+      SILENT_AT: 8
+
+  - id: monitor
+    path: uv
+    args: run --no-sync python -u nodes/monitor.py
+    inputs:
+      reading:
+        source: sensor/reading
+        input_timeout: 2.0
+
+  - id: slow_consumer
+    path: uv
+    args: run --no-sync python -u nodes/slow_consumer.py
+    inputs:
+      reading:
+        source: sensor/reading
+        queue_size: 2
+        queue_policy: drop_oldest

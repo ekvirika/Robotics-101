@@ -1,0 +1,29 @@
+nodes:
+  - id: sensor
+    path: uv
+    args: run --no-sync python -u ../../nodes/sensor.py
+    inputs:
+      tick: dora/timer/millis/500
+    outputs:
+      - value
+    deploy:
+      machine: robot
+
+  - id: compute
+    path: uv
+    args: run --no-sync python -u ../../nodes/compute.py
+    inputs:
+      value: sensor/value
+    outputs:
+      - result
+    deploy:
+      labels:
+        gpu: "true"
+
+  - id: display
+    path: uv
+    args: run --no-sync python -u ../../nodes/display.py
+    inputs:
+      result: compute/result
+    deploy:
+      machine: robot

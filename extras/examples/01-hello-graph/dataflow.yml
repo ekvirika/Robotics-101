@@ -1,0 +1,23 @@
+nodes:
+  - id: counter
+    path: uv
+    args: run --no-sync python -u nodes/counter.py
+    inputs:
+      tick: dora/timer/millis/500
+    outputs:
+      - count
+
+  - id: doubler
+    path: uv
+    args: run --no-sync python -u nodes/doubler.py
+    inputs:
+      count: counter/count
+    outputs:
+      - doubled
+
+  - id: printer
+    path: uv
+    args: run --no-sync python -u nodes/printer.py
+    inputs:
+      count: counter/count
+      doubled: doubler/doubled

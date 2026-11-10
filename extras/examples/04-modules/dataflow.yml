@@ -1,0 +1,24 @@
+nodes:
+  - id: camera
+    path: uv
+    args: run --no-sync python -u ../02-camera-pipeline/nodes/camera.py
+    inputs:
+      tick: dora/timer/millis/33
+    outputs:
+      - image
+    env:
+      PYTHONPATH: ../..
+      CAMERA_SOURCE: synthetic
+      IMAGE_WIDTH: 640
+      IMAGE_HEIGHT: 480
+
+  - id: vision
+    module: modules/perception.yml
+    inputs:
+      camera_feed: camera/image
+
+  - id: report
+    path: uv
+    args: run --no-sync python -u nodes/report.py
+    inputs:
+      detections: vision/detections

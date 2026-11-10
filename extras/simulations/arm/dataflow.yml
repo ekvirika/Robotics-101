@@ -1,0 +1,37 @@
+nodes:
+  - id: target
+    path: uv
+    args: run --no-sync python -u nodes/target.py
+    inputs:
+      tick: dora/timer/millis/50
+    outputs:
+      - target
+
+  - id: ik
+    path: uv
+    args: run --no-sync python -u nodes/ik.py
+    inputs:
+      target: target/target
+    outputs:
+      - joint_targets
+    env:
+      ELBOW: up
+
+  - id: arm
+    path: uv
+    args: run --no-sync python -u nodes/arm.py
+    inputs:
+      tick: dora/timer/millis/10
+      joint_targets: ik/joint_targets
+    outputs:
+      - joint_state
+      - hand
+
+  - id: viewer
+    path: uv
+    args: run --no-sync python -u nodes/viewer.py
+    inputs:
+      target: target/target
+      joint_state: arm/joint_state
+    env:
+      PYTHONPATH: ../..

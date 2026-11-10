@@ -1,0 +1,40 @@
+nodes:
+  - id: planner
+    path: uv
+    args: run --no-sync python -u nodes/service_client.py
+    inputs:
+      tick: dora/timer/millis/1000
+      response: gripper/response
+    outputs:
+      - request
+
+  - id: gripper
+    path: uv
+    args: run --no-sync python -u nodes/service_server.py
+    inputs:
+      request: planner/request
+      tick: dora/timer/millis/200
+    outputs:
+      - response
+
+  - id: mission
+    path: uv
+    args: run --no-sync python -u nodes/action_client.py
+    inputs:
+      tick: dora/timer/millis/500
+      feedback: base/feedback
+      result: base/result
+    outputs:
+      - goal
+      - cancel
+
+  - id: base
+    path: uv
+    args: run --no-sync python -u nodes/action_server.py
+    inputs:
+      goal: mission/goal
+      cancel: mission/cancel
+      tick: dora/timer/millis/250
+    outputs:
+      - feedback
+      - result

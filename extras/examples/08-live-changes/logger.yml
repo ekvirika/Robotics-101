@@ -1,0 +1,5 @@
+id: logger
+path: uv
+args: run --no-sync python -u nodes/logger.py
+inputs:
+  value: sensor/value

@@ -1,0 +1,33 @@
+nodes:
+  - id: simulator
+    path: uv
+    args: run --no-sync python -u nodes/simulator.py
+    inputs:
+      tick: dora/timer/millis/20
+      cmd_vel: planner/cmd_vel
+    outputs:
+      - pose
+      - scan
+
+  - id: planner
+    path: uv
+    args: run --no-sync python -u nodes/planner.py
+    inputs:
+      pose: simulator/pose
+      scan:
+        source: simulator/scan
+        queue_size: 1
+        queue_policy: drop_oldest
+    outputs:
+      - cmd_vel
+      - goal
+
+  - id: viewer
+    path: uv
+    args: run --no-sync python -u nodes/viewer.py
+    inputs:
+      pose: simulator/pose
+      scan: simulator/scan
+      goal: planner/goal
+    env:
+      PYTHONPATH: ../..
