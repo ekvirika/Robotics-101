@@ -11,7 +11,7 @@ The full G1 humanoid (29 body joints + two Dex3 hands = 43 motors) walks to tabl
 ```
 
 - The first run installs MuJoCo and ONNX Runtime (`uv sync --extra sim`).
-- A MuJoCo window opens. The terminal shows each step: `step 3/16: move the open hand next to the bottle`.
+- A MuJoCo window opens. The terminal shows each step: `step 3/17: move the open hand next to the bottle`.
 - At the end you get `done: the bottle stands 1.0 cm from the mark`. The robot keeps standing; Ctrl-C stops everything.
 - To push the robot or the bottle: double-click a part, then Ctrl + right-drag.
 - Backspace in the window resets only the physics, not the mission. To start over, stop and run again.
@@ -23,9 +23,9 @@ cd humanoid/03-g1-pick-place
 uv run python tests/test_mission.py
 ```
 
-## The 16 steps
+## The 17 steps
 
-walk to table A → raise the hand → move the open hand next to the bottle → move the hand around the bottle → close the hand → lift the bottle → hold it close → step back → walk to table B → move the bottle over the mark → put it down → open the hand → pull the hand away → raise the hand → arm down → step back
+walk to table A → raise the hand → move the open hand next to the bottle → move the hand around the bottle → close the hand → lift the bottle → hold it close → step back → walk to table B → move the bottle over the mark → put it down → open the hand → pull the hand away → raise the hand → hand in the carry pose → step back → arm down
 
 ## How it's built
 
@@ -36,7 +36,7 @@ Four dora nodes. Each does one job, the same split as on a real robot:
 | `sim` | physics at 500 Hz, the motor drivers, the sensors, the 3D window | the robot itself |
 | `locomotion` | walks (Unitree's trained policy) or stands still and balances | Unitree's locomotion controller |
 | `arm` | moves the right hand (inverse kinematics, smooth paths), opens and closes it | an arm controller (like MoveIt + ros2_control) |
-| `task` | the 16 steps | a mission planner / behavior tree |
+| `task` | the 17 steps | a mission planner / behavior tree |
 
 The messages between them:
 
@@ -107,7 +107,7 @@ The Dex3 hand has a thumb (3 joints) and two fingers (2 joints each). The palm f
 
 ### The mission
 
-`g1/mission.py` is a list of 16 steps, done one after another. Each step computes its target **when it starts**, from what the robot sees at that moment. If the robot stops 3 cm off, the hand target moves 3 cm too, so errors don't add up. To put the bottle down, the hand lowers until the bottle's bottom is 5 mm above the table (from the bottle's measured height), opens, and slides away sideways.
+`g1/mission.py` is a list of 17 steps, done one after another. Each step computes its target **when it starts**, from what the robot sees at that moment. If the robot stops 3 cm off, the hand target moves 3 cm too, so errors don't add up. To put the bottle down, the hand lowers until the bottle's bottom is 5 mm above the table (from the bottle's measured height), opens, and slides away sideways.
 
 ## Files
 
@@ -127,7 +127,7 @@ The Dex3 hand has a thumb (3 joints) and two fingers (2 joints each). The palm f
 │   ├── navigation.py         go to a spot -> walking velocity
 │   ├── arm_ik.py             inverse kinematics
 │   ├── arm.py                arm moves, gravity compensation, grip
-│   └── mission.py            the 16 steps
+│   └── mission.py            the 17 steps
 ├── robot/                    the G1 (MuJoCo Menagerie) and the room, see robot/README.md
 ├── policies/                 Unitree's walking policy, see policies/README.md
 ├── tests/test_mission.py     the whole mission without dora or window: PASS or FAIL

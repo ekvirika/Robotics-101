@@ -81,6 +81,7 @@ nodes:
     outputs:
       - cmd_vel
       - arm_command
+      - step # the step that just started, as text
     output_types:
       cmd_vel: std/core/v1/Float64
       arm_command: std/core/v1/Float64
@@ -89,3 +90,21 @@ nodes:
       PLACE_POINT: "1.0,-1.52" # the green mark on table B (x, y)
       PLACE_HEADING_DEG: -90 # face -y at table B
       TABLE_HEIGHT: 0.80
+
+  - id: dashboard
+    description: live 3D map, charts and mission log in Rerun; only listens
+    path: uv
+    args: run --no-sync python -u nodes/dashboard.py
+    inputs:
+      tick: dora/timer/millis/50 # redraw the robot 20 times a second
+      base_pose: sim/base_pose
+      bottle_pose: sim/bottle_pose
+      cmd_vel: task/cmd_vel
+      standing: locomotion/standing
+      arm_command: task/arm_command
+      arm_status: arm/arm_status
+      step: task/step
+    restart_policy: on-failure # not critical: restart it if it crashes
+    max_restarts: 3
+    env:
+      SCENE: robot/scene.xml
