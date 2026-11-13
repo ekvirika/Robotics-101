@@ -29,7 +29,7 @@ walk to table A → raise the hand → move the open hand next to the bottle →
 
 ## How it's built
 
-Four dora nodes. Each does one job, the same split as on a real robot:
+Seven dora nodes. Each does one job, the same split as on a real robot:
 
 | Node | Job | On the real G1 |
 | --- | --- | --- |
@@ -37,13 +37,19 @@ Four dora nodes. Each does one job, the same split as on a real robot:
 | `locomotion` | walks (Unitree's trained policy) or stands still and balances | Unitree's locomotion controller |
 | `arm` | moves the right hand (inverse kinematics, smooth paths), opens and closes it | an arm controller (like MoveIt + ros2_control) |
 | `task` | the 17 steps | a mission planner / behavior tree |
+| `camera` | renders the head camera, color and depth, 15 Hz | the RealSense D435i in the G1's head |
+| `perception` | finds the bottle in the images, its 3D position in the room | the same code |
+| `dashboard` | Rerun: 3D room, camera images, charts, mission log; only listens | the same code |
 
 The messages between them:
 
 | From → to | Message | How often | What's in it |
 | --- | --- | --- | --- |
 | sim → locomotion, arm | `low_state` | 500 Hz | 43 joint angles and speeds, IMU (tilt, turn rates) |
-| sim → task | `base_pose`, `bottle_pose` | 50 Hz | where the robot is, where the bottle is |
+| sim → task | `base_pose` | 50 Hz | where the robot is |
+| sim → camera | `world_state` | 15 Hz | every position in the scene, to draw it |
+| camera → perception | `rgb`, `depth`, `cam_pose` | 15 Hz | the images and where the camera was |
+| perception → task | `bottle_pose` | 15 Hz | where the camera sees the bottle |
 | locomotion → sim | `joint_command` | 50 Hz | legs + waist: target angle, kp, kd, extra torque |
 | arm → sim | `joint_command` | 50 Hz | arms + hands: the same four values per joint |
 | task → locomotion | `cmd_vel` | 50 Hz | walk: forward, left, turn |
@@ -113,12 +119,15 @@ The Dex3 hand has a thumb (3 joints) and two fingers (2 joints each). The palm f
 
 ```
 03-g1-pick-place/
-├── dataflow.yml              the dora graph: 4 nodes and their messages
+├── dataflow.yml              the dora graph: 7 nodes and their messages
 ├── nodes/                    the dora nodes: messages in -> g1 class -> messages out
 │   ├── sim.py                physics, motor drivers, sensors, 3D window
 │   ├── locomotion.py         walking / standing
 │   ├── arm.py                arm moves and grip
-│   └── task.py               the mission
+│   ├── task.py               the mission
+│   ├── camera.py             head camera images
+│   ├── perception.py         the bottle from the images
+│   └── dashboard.py          Rerun view
 ├── g1/                       the robot software (plain Python, no dora)
 │   ├── robot.py              joint names and groups, poses, gains
 │   ├── messages.py           the layout of every message
@@ -127,16 +136,20 @@ The Dex3 hand has a thumb (3 joints) and two fingers (2 joints each). The palm f
 │   ├── navigation.py         go to a spot -> walking velocity
 │   ├── arm_ik.py             inverse kinematics
 │   ├── arm.py                arm moves, gravity compensation, grip
-│   └── mission.py            the 17 steps
+│   ├── mission.py            the 17 steps
+│   ├── camera.py             head camera: render, intrinsics, pose
+│   ├── perception.py         color mask, back-projection, cylinder fit
+│   └── frames.py             room frame <-> robot frame, tilt
 ├── robot/                    the G1 (MuJoCo Menagerie) and the room, see robot/README.md
 ├── policies/                 Unitree's walking policy, see policies/README.md
-├── tests/test_mission.py     the whole mission without dora or window: PASS or FAIL
+├── tests/test_mission.py     the whole mission without dora or window: PASS or FAIL (--vision: from the camera)
+├── tests/test_camera.py      a known 3D point lands on the right pixel
 └── tools/export_walk_policy.py   rebuilds policies/g1_walk.onnx
 ```
 
 ## What a real robot does differently
 
-- **Where things are:** here the robot's position and the bottle's position come straight from the simulator. A real G1 needs localization (lidar + map) and a camera with an object detector.
+- **Where things are:** the bottle's position comes from the head camera (color, depth, a cylinder fit). The robot's own position still comes straight from the simulator; a real G1 needs localization (lidar + map).
 - **Obstacles:** there's no obstacle avoidance; the room is laid out so straight paths are free. A real robot uses a path planner (for example ROS 2 Nav2).
 - **Falls:** if you push it over, it doesn't get up.
 

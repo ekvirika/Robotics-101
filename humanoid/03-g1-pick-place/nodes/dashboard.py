@@ -4,7 +4,8 @@ It only listens, it sends nothing. You can remove it from the dataflow and the
 robot does exactly the same thing.
 
 Inputs:  base_pose     where the robot is and how far it leans, 50 Hz (sim)
-         bottle_pose   where the bottle is, 50 Hz (sim)
+         bottle_pose   where the bottle really is, 50 Hz (sim)
+         seen_bottle   where the camera says it is, 15 Hz (perception)
          cmd_vel       the walking command (task)
          standing      1 = legs stand still and steady (locomotion)
          arm_command   the hand target, in the body frame (task)
@@ -48,6 +49,7 @@ WOOD = (140, 97, 56)
 WHITE = (225, 225, 220)
 GREEN = (50, 200, 80)
 BLUE = (50, 140, 230)
+SEEN = (255, 210, 40)
 ROBOT = (240, 150, 60)
 HAND = (230, 70, 160)
 
@@ -74,6 +76,7 @@ def start_rerun():
                     rrb.TextLogView(name="mission", origin="log"),
                     rrb.TimeSeriesView(name="walk command", origin="cmd_vel"),
                     rrb.TimeSeriesView(name="balance", origin="balance"),
+                    rrb.TimeSeriesView(name="camera error", origin="perception"),
                     rrb.TimeSeriesView(name="standing", origin="standing"),
                 ),
                 column_shares=[3, 2],
@@ -117,6 +120,7 @@ robot_position = None
 robot_heading = 0.0
 trail = []
 time = 0.0
+true_bottle = None
 rgb = depth = None  # newest images, with their metadata
 last_image = -1e9
 pinhole_logged = False
@@ -138,6 +142,7 @@ for event in node:
 
     elif name == "bottle_pose":
         _, bottle, _ = messages.unpack_pose(event["value"].to_numpy())
+        true_bottle = bottle
         rr.set_time("sim_time", duration=time)
         rr.log(
             "world/bottle",
@@ -145,6 +150,23 @@ for event in node:
                 centers=[bottle], half_sizes=[[0.03, 0.03, 0.075]], colors=[BLUE]
             ),
         )
+
+    elif name == "seen_bottle":
+        seen_time, seen, _ = messages.unpack_pose(event["value"].to_numpy())
+        rr.set_time("sim_time", duration=seen_time)
+        rr.log(
+            "world/bottle_seen",
+            rr.Boxes3D(
+                centers=[seen],
+                half_sizes=[[0.03, 0.03, 0.075]],
+                colors=[SEEN],
+                labels=["seen"],
+            ),
+        )
+        if true_bottle is not None:
+            error = 100 * (seen - true_bottle)
+            rr.log("perception/xy_error_cm", rr.Scalars(np.hypot(error[0], error[1])))
+            rr.log("perception/z_error_cm", rr.Scalars(error[2]))
 
     elif name == "cmd_vel":
         forward, left, turn = event["value"].to_numpy()

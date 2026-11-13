@@ -1,13 +1,17 @@
 # Lesson 3: the full Unitree G1 picks up a bottle and puts it on another table.
 #
-#             base_pose, bottle_pose (50 Hz)
+#                       base_pose (50 Hz)
 #        ┌───────────────────────────────────────────┐
 #        │                                            ▼
-#      sim ──low_state (500 Hz)──▶ locomotion ◀──cmd_vel──── task
-#       ▲  ╲                         │   └──standing──────────▶ ▲
-#       │   ╲──low_state──▶ arm ◀────┼──arm_command────────────┤
-#       │                   │  └─────┼──arm_status─────────────┘
-#       └──joint commands───┴────────┘
+#      sim ──low_state (500 Hz)──▶ locomotion ◀──cmd_vel──── task ◀── bottle_pose ── perception
+#       ▲ ╲╲                         │   └──standing──────────▶ ▲                          ▲
+#       │  ╲╲──low_state──▶ arm ◀────┼──arm_command────────────┤             rgb, depth, cam_pose
+#       │   ╲               │  └─────┼──arm_status─────────────┘                          │
+#       └────╲joint commands┴────────┘                                                 camera
+#             ╲──world_state (15 Hz)──────────────────────────────────────────────────────┘
+#
+# The bottle position comes from the head camera. sim's own bottle_pose is the
+# truth, used only by the dashboard to show the camera's error.
 #
 # Run from the repository root:  ./run.sh g1-pick-place
 
@@ -29,7 +33,7 @@ nodes:
     outputs:
       - low_state # joint angles and speeds, IMU
       - base_pose # where the robot is (on hardware: localization)
-      - bottle_pose # where the bottle is (on hardware: camera + detector)
+      - bottle_pose # the TRUE bottle position: only the dashboard uses it, to show the camera's error
       - world_state # every position in the scene, for the camera (simulation only)
     output_types:
       low_state: std/core/v1/Float64
@@ -71,13 +75,32 @@ nodes:
     env:
       ROBOT: robot/g1_with_hands.xml
 
+  - id: perception
+    description: finds the bottle in the head camera's images, says where it is in the room
+    path: uv
+    args: run --no-sync python -u nodes/perception.py
+    inputs:
+      rgb:
+        source: camera/rgb
+        queue_size: 1
+      depth:
+        source: camera/depth
+        queue_size: 1
+      cam_pose:
+        source: camera/cam_pose
+        queue_size: 1
+    outputs:
+      - bottle_pose
+    output_types:
+      bottle_pose: std/core/v1/Float64
+
   - id: task
     description: the mission, step by step (g1/mission.py)
     path: uv
     args: run --no-sync python -u nodes/task.py
     inputs:
       base_pose: sim/base_pose
-      bottle_pose: sim/bottle_pose
+      bottle_pose: perception/bottle_pose # seen by the camera, not read from the simulator
       standing: locomotion/standing
       arm_status: arm/arm_status
     outputs:
@@ -122,7 +145,8 @@ nodes:
     inputs:
       tick: dora/timer/millis/50 # redraw the robot 20 times a second
       base_pose: sim/base_pose
-      bottle_pose: sim/bottle_pose
+      bottle_pose: sim/bottle_pose # the truth
+      seen_bottle: perception/bottle_pose
       cmd_vel: task/cmd_vel
       standing: locomotion/standing
       arm_command: task/arm_command
