@@ -10,7 +10,13 @@ Inputs:  base_pose     where the robot is and how far it leans, 50 Hz (sim)
          arm_command   the hand target, in the body frame (task)
          arm_status    which arm command finished (arm)
          step          the mission step as text (task)
+         rgb, depth    the head camera images, 15 Hz (camera)
+         cam_pose      where the head camera is, 15 Hz (camera)
          tick          draw timer
+
+The head camera is drawn twice: as a 2D image, and in the 3D room as a
+pyramid (its field of view) with the image on it. Images are logged 5 times
+a second and compressed, so a saved run stays small.
 
 The tables and the green mark come from robot/scene.xml, so the map always
 matches the simulation.
@@ -30,6 +36,7 @@ from g1 import frames, messages
 from g1.simulator import yaw_of
 
 TRAIL_POINTS = 2000  # how much of the walked path to keep (50 Hz: 40 s)
+IMAGE_EVERY = 0.19  # s of robot time between logged images: every 3rd frame of 15 Hz (5 Hz)
 HAND_KINDS = {
     messages.REST: "arm down",
     messages.MOVE_JOINTS: "joint move",
@@ -55,7 +62,14 @@ def start_rerun():
     rr.send_blueprint(
         rrb.Blueprint(
             rrb.Horizontal(
-                rrb.Spatial3DView(name="room", origin="world"),
+                rrb.Vertical(
+                    rrb.Spatial3DView(name="room", origin="world"),
+                    rrb.Horizontal(
+                        rrb.Spatial2DView(name="head camera", origin="world/head_cam"),
+                        rrb.Spatial2DView(name="depth", origin="head_depth"),
+                    ),
+                    row_shares=[3, 2],
+                ),
                 rrb.Vertical(
                     rrb.TextLogView(name="mission", origin="log"),
                     rrb.TimeSeriesView(name="walk command", origin="cmd_vel"),
@@ -103,6 +117,9 @@ robot_position = None
 robot_heading = 0.0
 trail = []
 time = 0.0
+rgb = depth = None  # newest images, with their metadata
+last_image = -1e9
+pinhole_logged = False
 
 for event in node:
     if event["type"] == "STOP":
@@ -165,6 +182,50 @@ for event in node:
         rr.set_time("sim_time", duration=time)
         level = "DEBUG" if ok else "ERROR"
         rr.log("log", rr.TextLog(f"arm #{command_id}: {'done' if ok else 'failed'}", level=level))
+
+    elif name == "rgb":
+        rgb = (event["value"].to_numpy(), event["metadata"])
+
+    elif name == "depth":
+        depth = (event["value"].to_numpy(), event["metadata"])
+
+    elif name == "cam_pose":
+        # The camera sends rgb, depth, then cam_pose: when the pose arrives, the
+        # images of the same moment are already here.
+        pose = event["value"].to_numpy()
+        image_time = pose[0]
+        if rgb is None or rgb[1]["time"] != image_time:
+            continue
+        if image_time - last_image < IMAGE_EVERY:
+            continue
+        last_image = image_time
+        meta = rgb[1]
+        width, height = meta["width"], meta["height"]
+        rr.set_time("sim_time", duration=image_time)
+        if not pinhole_logged:
+            rr.log(
+                "world/head_cam",
+                rr.Pinhole(
+                    focal_length=[meta["fx"], meta["fy"]],
+                    principal_point=[meta["cx"], meta["cy"]],
+                    width=width,
+                    height=height,
+                    camera_xyz=rr.ViewCoordinates.RDF,  # x right, y down, z ahead
+                    image_plane_distance=0.4,
+                ),
+                static=True,
+            )
+            pinhole_logged = True
+        rr.log(
+            "world/head_cam",
+            rr.Transform3D(translation=pose[1:4], mat3x3=pose[4:13].reshape(3, 3)),
+        )
+        image = rgb[0].reshape(height, width, 3)
+        rr.log("world/head_cam", rr.Image(image).compress(jpeg_quality=75))
+        if depth is not None and depth[1]["time"] == image_time:
+            meters = depth[0].reshape(height, width)[::2, ::2]  # half size is enough to look at
+            millimeters = np.clip(meters * 1000, 0, 65535).astype(np.uint16)  # like the RealSense
+            rr.log("head_depth", rr.DepthImage(millimeters, meter=1000.0))
 
     elif name == "tick" and robot_position is not None:
         rr.set_time("sim_time", duration=time)

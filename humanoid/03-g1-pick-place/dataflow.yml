@@ -30,10 +30,12 @@ nodes:
       - low_state # joint angles and speeds, IMU
       - base_pose # where the robot is (on hardware: localization)
       - bottle_pose # where the bottle is (on hardware: camera + detector)
+      - world_state # every position in the scene, for the camera (simulation only)
     output_types:
       low_state: std/core/v1/Float64
       base_pose: std/core/v1/Float64
       bottle_pose: std/core/v1/Float64
+      world_state: std/core/v1/Float64
     env:
       SCENE: robot/scene.xml
 
@@ -91,6 +93,28 @@ nodes:
       PLACE_HEADING_DEG: -90 # face -y at table B
       TABLE_HEIGHT: 0.80
 
+  - id: camera
+    description: the head camera, color and depth, drawn from the simulation's state
+    path: uv
+    args: run --no-sync python -u nodes/camera.py
+    inputs:
+      world_state:
+        source: sim/world_state
+        queue_size: 1 # only the newest state matters: skip any the camera had no time for
+    outputs:
+      - rgb
+      - depth
+      - cam_pose
+    output_types:
+      rgb: std/core/v1/UInt8
+      depth: std/core/v1/Float32
+      cam_pose: std/core/v1/Float64
+    env:
+      SCENE: robot/scene.xml
+      CAMERA: head_cam # in robot/g1_with_hands.xml
+      WIDTH: 640
+      HEIGHT: 480
+
   - id: dashboard
     description: live 3D map, charts and mission log in Rerun; only listens
     path: uv
@@ -104,6 +128,13 @@ nodes:
       arm_command: task/arm_command
       arm_status: arm/arm_status
       step: task/step
+      rgb:
+        source: camera/rgb
+        queue_size: 1
+      depth:
+        source: camera/depth
+        queue_size: 1
+      cam_pose: camera/cam_pose
     restart_policy: on-failure # not critical: restart it if it crashes
     max_restarts: 3
     env:

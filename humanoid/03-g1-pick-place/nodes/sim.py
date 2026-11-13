@@ -12,6 +12,7 @@ Inputs:  tick            2 ms timer: one physics step
 Outputs: low_state       joint angles/speeds + IMU, every step (500 Hz)
          base_pose       where the robot is, every 10 steps (50 Hz)
          bottle_pose     where the bottle is, every 10 steps (50 Hz)
+         world_state     every position in the scene, every 33 steps (15 Hz), for the camera
 
 Physics starts when both controllers have sent their first command, like
 a real robot that waits for its controller before it moves.
@@ -28,7 +29,8 @@ from dora import Node
 from g1 import messages, robot
 from g1.simulator import Simulator
 
-POSE_EVERY = 10  # steps per pose message: 500 Hz / 10 = 50 Hz, like a camera
+POSE_EVERY = 10  # steps per pose message: 500 Hz / 10 = 50 Hz
+STATE_EVERY = 33  # steps per world_state: 500 Hz / 33 = 15 Hz, the camera's frame rate
 DRAW_EVERY = 8  # ticks per window frame: 500 / 8 = about 60 frames per second
 REPORT_EVERY = 5000  # steps between speed reports: every 10 s of robot time
 
@@ -75,6 +77,9 @@ with mujoco.viewer.launch_passive(sim.model, sim.data) as viewer:
                 if steps % POSE_EVERY == 0:
                     send_pose("base_pose", *sim.base_pose())
                     send_pose("bottle_pose", *sim.bottle_pose())
+                if steps % STATE_EVERY == 0:
+                    state = messages.pack_world_state(sim.time, sim.world_state())
+                    node.send_output("world_state", pa.array(state))
 
             q, dq = sim.joint_state()
             quat, gyro = sim.imu()

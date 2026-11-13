@@ -7,3 +7,4 @@ out/
 .dora/
 _work/
 .idea/
+MUJOCO_LOG.TXT
