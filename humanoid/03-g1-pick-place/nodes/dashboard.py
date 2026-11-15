@@ -6,6 +6,7 @@ robot does exactly the same thing.
 Inputs:  base_pose     where the robot is and how far it leans, 50 Hz (sim)
          bottle_pose   where the bottle really is, 50 Hz (sim)
          seen_bottle   where the camera says it is, 15 Hz (perception)
+         objects       the memory: every object seen, with its id (world)
          cmd_vel       the walking command (task)
          standing      1 = legs stand still and steady (locomotion)
          arm_command   the hand target, in the body frame (task)
@@ -25,6 +26,7 @@ matches the simulation.
 VIEWER=rerun (default) opens the Rerun window, VIEWER=save writes out/g1.rrd.
 """
 
+import json
 import os
 
 import mujoco
@@ -50,6 +52,8 @@ WHITE = (225, 225, 220)
 GREEN = (50, 200, 80)
 BLUE = (50, 140, 230)
 SEEN = (255, 210, 40)
+OBJECT_COLORS = {"red": (220, 50, 50), "yellow": (240, 200, 30), "green": (60, 180, 80), "blue": (60, 130, 230)}
+HALF_SIZES = {"bottle": (0.03, 0.03, 0.075), "can": (0.033, 0.033, 0.06), "box": (0.03, 0.03, 0.05)}
 ROBOT = (240, 150, 60)
 HAND = (230, 70, 160)
 
@@ -74,6 +78,7 @@ def start_rerun():
                 ),
                 rrb.Vertical(
                     rrb.TextLogView(name="mission", origin="log"),
+                    rrb.TextDocumentView(name="memory", origin="memory"),
                     rrb.TimeSeriesView(name="walk command", origin="cmd_vel"),
                     rrb.TimeSeriesView(name="balance", origin="balance"),
                     rrb.TimeSeriesView(name="camera error", origin="perception"),
@@ -167,6 +172,25 @@ for event in node:
             error = 100 * (seen - true_bottle)
             rr.log("perception/xy_error_cm", rr.Scalars(np.hypot(error[0], error[1])))
             rr.log("perception/z_error_cm", rr.Scalars(error[2]))
+
+    elif name == "objects":
+        remembered = json.loads(event["value"][0].as_py())
+        rr.set_time("sim_time", duration=event["metadata"]["time"])
+        rr.log(
+            "world/memory",
+            rr.Boxes3D(
+                centers=[o["position"] for o in remembered],
+                half_sizes=[HALF_SIZES.get(o["kind"], (0.03, 0.03, 0.06)) for o in remembered],
+                colors=[OBJECT_COLORS.get(o["color"], (200, 200, 200)) for o in remembered],
+                labels=[f"#{o['id']} {o['color']} {o['kind'] or 'object'}" for o in remembered],
+            ),
+        )
+        lines = [
+            f"#{o['id']:<3} {o['color']:<7} {o['kind'] or '?':<7} at ({o['position'][0]:.2f}, {o['position'][1]:.2f})"
+            f"  seen {o['sightings']}x, last t={o['last_seen']:.1f}s"
+            for o in remembered
+        ]
+        rr.log("memory", rr.TextDocument("\n".join(lines) or "nothing seen yet"))
 
     elif name == "cmd_vel":
         forward, left, turn = event["value"].to_numpy()

@@ -65,6 +65,22 @@ class Camera:
         self.renderer.disable_depth_rendering()
         return depth
 
+    def segmentation(self):
+        """(height, width) int32: the body id seen at each pixel, -1 for none.
+
+        Only a simulator can give this: the exact truth of which object every
+        pixel belongs to. Used to score detectors, never to drive the robot.
+        """
+        self.renderer.enable_segmentation_rendering()
+        self.renderer.update_scene(self.data, camera=self.id)
+        ids = self.renderer.render()
+        self.renderer.disable_segmentation_rendering()
+        geom, kind = ids[..., 0], ids[..., 1]
+        is_geom = (kind == int(mujoco.mjtObj.mjOBJ_GEOM)) & (geom >= 0)
+        body = np.full(geom.shape, -1, dtype=np.int32)
+        body[is_geom] = self.model.geom_bodyid[geom[is_geom]]
+        return body
+
     def pose(self):
         """Camera position and rotation in the world, image convention (x right, y down, z ahead).
 

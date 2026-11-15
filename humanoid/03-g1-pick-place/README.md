@@ -16,6 +16,8 @@ The full G1 humanoid (29 body joints + two Dex3 hands = 43 motors) walks to tabl
 - To push the robot or the bottle: double-click a part, then Ctrl + right-drag.
 - Backspace in the window resets only the physics, not the mission. To start over, stop and run again.
 
+A random room with more objects on the tables (tell-the-robot phase 3): `SEED=7 ./run.sh g1-pick-place`. The robot still fetches the blue bottle; the Rerun **memory** panel lists everything it has seen.
+
 To check it without a window: it runs about 10x faster than real time and ends with PASS or FAIL.
 
 ```bash
@@ -29,7 +31,7 @@ walk to table A → raise the hand → move the open hand next to the bottle →
 
 ## How it's built
 
-Seven dora nodes. Each does one job, the same split as on a real robot:
+Nine dora nodes. Each does one job, the same split as on a real robot:
 
 | Node | Job | On the real G1 |
 | --- | --- | --- |
@@ -39,6 +41,8 @@ Seven dora nodes. Each does one job, the same split as on a real robot:
 | `task` | the 17 steps | a mission planner / behavior tree |
 | `camera` | renders the head camera, color and depth, 15 Hz | the RealSense D435i in the G1's head |
 | `perception` | finds the bottle in the images, its 3D position in the room | the same code |
+| `detector` | OWLv2 finds every object on the tables while the robot stands still; kind from height, color from hue | the same code |
+| `world` | the memory: every object seen, with an id that doesn't change, forgotten only when the camera should see it and doesn't | the same code |
 | `dashboard` | Rerun: 3D room, camera images, charts, mission log; only listens | the same code |
 
 The messages between them:
@@ -119,7 +123,7 @@ The Dex3 hand has a thumb (3 joints) and two fingers (2 joints each). The palm f
 
 ```
 03-g1-pick-place/
-├── dataflow.yml              the dora graph: 7 nodes and their messages
+├── dataflow.yml              the dora graph: 9 nodes and their messages
 ├── nodes/                    the dora nodes: messages in -> g1 class -> messages out
 │   ├── sim.py                physics, motor drivers, sensors, 3D window
 │   ├── locomotion.py         walking / standing
@@ -127,6 +131,8 @@ The Dex3 hand has a thumb (3 joints) and two fingers (2 joints each). The palm f
 │   ├── task.py               the mission
 │   ├── camera.py             head camera images
 │   ├── perception.py         the bottle from the images
+│   ├── detector.py           objects on the tables, 1.5 Hz while standing
+│   ├── world.py              the memory of objects
 │   └── dashboard.py          Rerun view
 ├── g1/                       the robot software (plain Python, no dora)
 │   ├── robot.py              joint names and groups, poses, gains
@@ -139,11 +145,17 @@ The Dex3 hand has a thumb (3 joints) and two fingers (2 joints each). The palm f
 │   ├── mission.py            the 17 steps
 │   ├── camera.py             head camera: render, intrinsics, pose
 │   ├── perception.py         color mask, back-projection, cylinder fit
-│   └── frames.py             room frame <-> robot frame, tilt
+│   ├── frames.py             room frame <-> robot frame, tilt
+│   ├── detector.py           OWLv2: where objects are
+│   ├── objects.py            box -> kind, color, position; merge duplicates
+│   ├── world.py              the memory: matching, ids, careful forgetting
+│   ├── survey.py             look around: two spots, three views
+│   └── scenes.py             random rooms (SEED=7 ./run.sh g1-pick-place)
 ├── robot/                    the G1 (MuJoCo Menagerie) and the room, see robot/README.md
 ├── policies/                 Unitree's walking policy, see policies/README.md
 ├── tests/test_mission.py     the whole mission without dora or window: PASS or FAIL (--vision: from the camera)
 ├── tests/test_camera.py      a known 3D point lands on the right pixel
+├── tests/test_world.py       the memory's rules, without a simulator
 └── tools/export_walk_policy.py   rebuilds policies/g1_walk.onnx
 ```
 

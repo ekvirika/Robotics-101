@@ -1,0 +1,160 @@
+"""The robot's memory of objects: what it has seen, where, and when.
+
+The camera only sees what is in front of it. The memory keeps everything the
+robot has seen, so it can act on an object it saw a minute ago behind it.
+Each update does three things:
+
+  1. Match (data association): pair each new sighting with a remembered object.
+     The closest pairs first, at most GATE apart, and only if the colors agree.
+     (The best overall pairing is the Hungarian algorithm; closest-first is
+     enough while objects stand at least 13 cm apart. Exercise in PHASE-3.md.)
+  2. Update or add: a matched object's position moves toward the sighting, its
+     kind and color are votes, so one bad frame doesn't change them. An
+     unmatched sighting is a new object with a new id.
+  3. Forget, carefully: an object is only counted as missing if the camera
+     *should* see it now: inside the image, and nothing nearer in the depth
+     image covers it. Out of view or hidden: keep it, unchanged. Missing
+     MISSES_TO_FORGET times in a row: it was moved away, forget it.
+
+Ids never change and are never reused, so "object 3" means the same thing to
+every node, and later to the language model.
+"""
+
+from collections import Counter
+from dataclasses import dataclass, field
+
+import numpy as np
+
+GATE = 0.08  # m: a sighting further than this from an object is something else
+SMOOTHING = 0.3  # how far a position moves toward each new sighting (0..1)
+MISSES_TO_FORGET = 3
+IMAGE_MARGIN = 20  # pixels: near the image edge, an object may be half outside
+HIDDEN = 0.05  # m: something this much nearer in the depth image covers the object
+MAX_RANGE = 2.5  # m: further away, the detector may miss it, don't count as missing
+AXIS = (-0.05, -0.025, 0.0, 0.025, 0.05)  # m above / below the center: points checked up the object
+ENOUGH = 3  # of the AXIS points must be in view and uncovered
+
+
+@dataclass
+class Remembered:
+    id: int
+    position: np.ndarray
+    first_seen: float
+    last_seen: float
+    kinds: Counter = field(default_factory=Counter)
+    colors: Counter = field(default_factory=Counter)
+    misses: int = 0
+    sightings: int = 0
+
+    @property
+    def kind(self):
+        return self.kinds.most_common(1)[0][0] if self.kinds else None
+
+    @property
+    def color(self):
+        return self.colors.most_common(1)[0][0] if self.colors else None
+
+    @property
+    def label(self):
+        return f"{self.color} {self.kind or 'object'}"
+
+    def as_dict(self):
+        return {
+            "id": self.id,
+            "kind": self.kind,
+            "color": self.color,
+            "position": [round(float(v), 4) for v in self.position],
+            "last_seen": round(self.last_seen, 2),
+            "sightings": self.sightings,
+        }
+
+
+class World:
+    def __init__(self):
+        self.objects = {}
+        self.next_id = 1
+
+    def match(self, seen):
+        """[(sighting index, object id)], closest pairs first."""
+        pairs = []
+        for i, s in enumerate(seen):
+            for obj in self.objects.values():
+                if obj.color is not None and s.color != obj.color:
+                    continue
+                distance = np.hypot(*(s.position[:2] - obj.position[:2]))
+                if distance <= GATE:
+                    pairs.append((distance, i, obj.id))
+        used_seen, used_objects, matches = set(), set(), []
+        for _, i, object_id in sorted(pairs):
+            if i in used_seen or object_id in used_objects:
+                continue
+            used_seen.add(i)
+            used_objects.add(object_id)
+            matches.append((i, object_id))
+        return matches
+
+    def update(self, time, seen, should_see):
+        """seen: g1.objects.Seen list from one image. should_see(position) -> bool for that image."""
+        matches = self.match(seen)
+        matched_seen = {i for i, _ in matches}
+        matched_objects = {object_id for _, object_id in matches}
+
+        for i, object_id in matches:
+            obj, s = self.objects[object_id], seen[i]
+            obj.position = obj.position + SMOOTHING * (s.position - obj.position)
+            obj.last_seen = time
+            obj.misses = 0
+            obj.sightings += 1
+            if s.kind is not None:
+                obj.kinds[s.kind] += 1
+            obj.colors[s.color] += 1
+
+        for i, s in enumerate(seen):
+            if i in matched_seen:
+                continue
+            obj = Remembered(self.next_id, s.position.copy(), time, time, sightings=1)
+            if s.kind is not None:
+                obj.kinds[s.kind] += 1
+            obj.colors[s.color] += 1
+            self.objects[obj.id] = obj
+            self.next_id += 1
+
+        for object_id in list(self.objects):
+            if object_id in matched_objects:
+                continue
+            if should_see(self.objects[object_id].position):
+                self.objects[object_id].misses += 1
+                if self.objects[object_id].misses >= MISSES_TO_FORGET:
+                    del self.objects[object_id]
+
+    def find(self, kind=None, color=None):
+        return [o for o in self.objects.values() if (kind is None or o.kind == kind) and (color is None or o.color == color)]
+
+    def as_list(self):
+        return [o.as_dict() for o in sorted(self.objects.values(), key=lambda o: o.id)]
+
+
+def point_visible(point, depth, fx, fy, cx, cy, cam_position, cam_rotation):
+    """Is this one point in the image, in range, and not covered by something nearer?"""
+    x, y, z = cam_rotation.T @ (np.asarray(point) - cam_position)
+    if z <= 0.1 or z > MAX_RANGE:
+        return False
+    u, v = fx * x / z + cx, fy * y / z + cy
+    height, width = depth.shape
+    if not (IMAGE_MARGIN <= u < width - IMAGE_MARGIN and IMAGE_MARGIN <= v < height - IMAGE_MARGIN):
+        return False
+    return depth[int(v), int(u)] > z - HIDDEN
+
+
+def should_see(position, depth, fx, fy, cx, cy, cam_position, cam_rotation):
+    """Would the camera see an object here now? Enough points up its axis are visible.
+
+    One point is not enough: a bottle in front may cover the middle of the spot
+    and leave its top free, or the other way round. If the spot is covered, the
+    robot can't know whether the object is still there, so it keeps it.
+    """
+    visible = sum(
+        point_visible(np.asarray(position) + [0.0, 0.0, dz], depth, fx, fy, cx, cy, cam_position, cam_rotation)
+        for dz in AXIS
+    )
+    return visible >= ENOUGH

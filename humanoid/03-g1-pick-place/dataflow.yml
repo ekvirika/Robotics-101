@@ -41,7 +41,7 @@ nodes:
       bottle_pose: std/core/v1/Float64
       world_state: std/core/v1/Float64
     env:
-      SCENE: robot/scene.xml
+      SCENE: robot/scene_live.xml # written by run.sh: scene.xml, or random room SEED
 
   - id: locomotion
     description: walks with Unitree's trained policy, or stands still and balances
@@ -94,6 +94,45 @@ nodes:
     output_types:
       bottle_pose: std/core/v1/Float64
 
+  - id: detector
+    description: finds the objects on the tables (OWLv2) while the robot stands still, 1.5 times a second
+    path: uv
+    args: run --no-sync python -u nodes/detector.py
+    inputs:
+      tick: dora/timer/millis/667 # look at most 1.5 times a second: OWLv2 is heavy
+      standing:
+        source: locomotion/standing
+        queue_size: 30 # 0.6 s of 50 Hz: what arrives while the detector works on one image
+      rgb:
+        source: camera/rgb
+        queue_size: 2 # only the newest images matter, older ones are dropped
+      depth:
+        source: camera/depth
+        queue_size: 2
+      cam_pose:
+        source: camera/cam_pose
+        queue_size: 2
+    outputs:
+      - seen
+    env:
+      HF_HUB_OFFLINE: 1 # the weights are in ~/.cache/huggingface already
+      TORCH_NUM_THREADS: 4
+
+  - id: world
+    description: the memory of every object seen, with ids that don't change
+    path: uv
+    args: run --no-sync python -u nodes/world.py
+    inputs:
+      seen: detector/seen
+      depth:
+        source: camera/depth
+        queue_size: 50 # 3 s of images: the detector's result arrives ~0.4 s after its image
+      cam_pose:
+        source: camera/cam_pose
+        queue_size: 50
+    outputs:
+      - objects
+
   - id: task
     description: the mission, step by step (g1/mission.py)
     path: uv
@@ -133,7 +172,7 @@ nodes:
       depth: std/core/v1/Float32
       cam_pose: std/core/v1/Float64
     env:
-      SCENE: robot/scene.xml
+      SCENE: robot/scene_live.xml # written by run.sh: scene.xml, or random room SEED
       CAMERA: head_cam # in robot/g1_with_hands.xml
       WIDTH: 640
       HEIGHT: 480
@@ -147,6 +186,7 @@ nodes:
       base_pose: sim/base_pose
       bottle_pose: sim/bottle_pose # the truth
       seen_bottle: perception/bottle_pose
+      objects: world/objects
       cmd_vel: task/cmd_vel
       standing: locomotion/standing
       arm_command: task/arm_command
@@ -162,4 +202,4 @@ nodes:
     restart_policy: on-failure # not critical: restart it if it crashes
     max_restarts: 3
     env:
-      SCENE: robot/scene.xml
+      SCENE: robot/scene_live.xml # written by run.sh: scene.xml, or random room SEED

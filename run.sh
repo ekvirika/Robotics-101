@@ -60,7 +60,8 @@ dir="$(folder_of "$name")"
 
 case "$name" in
   yolo|fake-camera|robust) uv sync --quiet --extra vision ;;
-  arm-nodes|g1-pick-place) uv sync --quiet --extra sim ;;
+  arm-nodes) uv sync --quiet --extra sim ;;
+  g1-pick-place) uv sync --quiet --extra sim --extra detect ;;
   *) uv sync --quiet ;;
 esac
 
@@ -71,6 +72,10 @@ for arg in "$@"; do
 done
 
 cd "$dir"
+if [[ "$name" == "g1-pick-place" ]]; then
+  # the room: robot/scene.xml, or with SEED=<n> a random room with more objects (tell-the-robot phase 3)
+  uv run --no-sync python -m g1.scenes "${SEED:-}"
+fi
 if [[ "$name" == "types" ]]; then
   dora validate dataflow.yml
   dora validate broken.yml
