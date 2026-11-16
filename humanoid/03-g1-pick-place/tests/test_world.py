@@ -76,3 +76,17 @@ def test_out_of_view_or_hidden_object_is_kept():
     for t in range(1, 20):
         world.update(float(t), [], never)
     assert list(world.objects) == [1]
+
+
+def test_held_object_follows_the_hand_and_is_never_missing():
+    world = World()
+    world.update(0.0, [seen(1.4, 0.0)], always)
+    world.hold(1)
+    world.update(1.0, [seen(1.3, -0.1)], always)  # lifted, moved with the hand
+    assert list(world.objects) == [1]
+    assert np.isclose(world.objects[1].position[0], 1.3)
+    for t in range(2, 10):
+        world.update(float(t), [], always)
+    assert list(world.objects) == [1]
+    world.release((1.0, -1.52, 0.875))
+    assert world.held is None and np.isclose(world.objects[1].position[1], -1.52)

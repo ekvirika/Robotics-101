@@ -141,7 +141,8 @@ def look(detector, rgb, depth, fx, fy, cx, cy, cam_position, cam_rotation):
     """Everything on the tables in one image: detector boxes -> described, filtered, merged."""
     boxes, _ = detector(rgb)
     seen = [describe(b, rgb, depth, fx, fy, cx, cy, cam_position, cam_rotation) for b in boxes]
-    return merge_same([s for s in seen if s is not None and on_a_table(s.position)])
+    real = [s for s in seen if s is not None and on_a_table(s.position) and s.color in HUES]
+    return merge_same(real)  # no color: the robot's own (white and grey) hand, not an object
 
 
 def to_dict(seen):

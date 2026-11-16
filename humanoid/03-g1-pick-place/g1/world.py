@@ -18,6 +18,10 @@ Each update does three things:
 
 Ids never change and are never reused, so "object 3" means the same thing to
 every node, and later to the language model.
+
+The object in the hand (hold / release, told by the skills) is special: it
+moves with the hand, so sightings near it update it instead of making a new
+object, and it is never counted as missing from where it used to stand.
 """
 
 from collections import Counter
@@ -30,6 +34,8 @@ SMOOTHING = 0.3  # how far a position moves toward each new sighting (0..1)
 MISSES_TO_FORGET = 3
 IMAGE_MARGIN = 20  # pixels: near the image edge, an object may be half outside
 HIDDEN = 0.05  # m: something this much nearer in the depth image covers the object
+ARM_AREA = 0.3  # m: around where the arm works, the robot's own hand hides objects
+HELD_RADIUS = 0.2  # m: a sighting this close to the held object, same color, is the held object
 MAX_RANGE = 2.5  # m: further away, the detector may miss it, don't count as missing
 AXIS = (-0.05, -0.025, 0.0, 0.025, 0.05)  # m above / below the center: points checked up the object
 ENOUGH = 3  # of the AXIS points must be in view and uncovered
@@ -73,6 +79,39 @@ class World:
     def __init__(self):
         self.objects = {}
         self.next_id = 1
+        self.held = None
+        self.arm_area = None  # (x, y) where the arm works at a table, or None
+
+    def arm_working(self, spot):
+        """The arm works at a table around spot (x, y), or None when it is done.
+
+        The robot's own hand stands right next to objects there, at their depth:
+        the detector misses them, and nothing nearer covers them. So near the arm,
+        a miss proves nothing and is not counted.
+        """
+        self.arm_area = None if spot is None else np.asarray(spot[:2], float)
+
+    def hold(self, object_id):
+        self.held = object_id if object_id in self.objects else None
+
+    def release(self, position=None):
+        """The held object stands somewhere again: at `position` if given."""
+        if self.held is not None and position is not None:
+            self.objects[self.held].position = np.asarray(position, float)
+            self.objects[self.held].misses = 0
+        self.held = None
+
+    def _held_sighting(self, seen):
+        """Index of the sighting that is the held object, or None."""
+        if self.held is None:
+            return None
+        obj = self.objects[self.held]
+        near = [
+            (np.hypot(*(s.position[:2] - obj.position[:2])), i)
+            for i, s in enumerate(seen)
+            if s.color == obj.color and np.hypot(*(s.position[:2] - obj.position[:2])) < HELD_RADIUS
+        ]
+        return min(near)[1] if near else None
 
     def match(self, seen):
         """[(sighting index, object id)], closest pairs first."""
@@ -95,9 +134,14 @@ class World:
 
     def update(self, time, seen, should_see):
         """seen: g1.objects.Seen list from one image. should_see(position) -> bool for that image."""
-        matches = self.match(seen)
+        held_index = self._held_sighting(seen)
+        if held_index is not None:
+            self.objects[self.held].position = seen[held_index].position.copy()
+            self.objects[self.held].last_seen = time
+            seen = seen[:held_index] + seen[held_index + 1 :]
+        matches = [(i, o) for i, o in self.match(seen) if o != self.held]
         matched_seen = {i for i, _ in matches}
-        matched_objects = {object_id for _, object_id in matches}
+        matched_objects = {object_id for _, object_id in matches} | {self.held}
 
         for i, object_id in matches:
             obj, s = self.objects[object_id], seen[i]
@@ -122,7 +166,8 @@ class World:
         for object_id in list(self.objects):
             if object_id in matched_objects:
                 continue
-            if should_see(self.objects[object_id].position):
+            near_arm = self.arm_area is not None and np.hypot(*(self.objects[object_id].position[:2] - self.arm_area)) < ARM_AREA
+            if not near_arm and should_see(self.objects[object_id].position):
                 self.objects[object_id].misses += 1
                 if self.objects[object_id].misses >= MISSES_TO_FORGET:
                     del self.objects[object_id]

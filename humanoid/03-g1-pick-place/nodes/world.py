@@ -4,6 +4,8 @@ Inputs:  seen          what the detector found in one image (detector)
          depth         head camera depth images, 15 Hz (camera): kept for a few
          cam_pose      seconds, to check what the camera should have seen in the
                        image the detector used
+         arm_area      [x, y] where the arm works, [nan, nan] when done (skills)
+         held          [id, x, y, z] picked up / [-1, x, y, z] put down at x, y, z (skills)
 Outputs: objects       JSON text: [{id, kind, color, position, last_seen, sightings}],
                        after every update
 
@@ -38,6 +40,16 @@ for event in node:
     elif name == "cam_pose":
         p = event["value"].to_numpy()
         poses[p[0]] = p
+    elif name == "arm_area":
+        area = event["value"].to_numpy()
+        memory.arm_working(None if np.isnan(area[0]) else area)
+    elif name == "held":
+        held = event["value"].to_numpy()
+        if held[0] >= 0:
+            memory.hold(int(held[0]))
+        else:
+            memory.release(None if np.isnan(held[1]) else held[1:4])
+        node.send_output("objects", pa.array([json.dumps(memory.as_list())]), {"time": 0.0})
     elif name == "seen":
         report = json.loads(event["value"][0].as_py())
         time = report["time"]

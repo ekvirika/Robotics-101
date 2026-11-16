@@ -16,6 +16,8 @@ The full G1 humanoid (29 body joints + two Dex3 hands = 43 motors) walks to tabl
 - To push the robot or the bottle: double-click a part, then Ctrl + right-drag.
 - Backspace in the window resets only the physics, not the mission. To start over, stop and run again.
 
+Skills instead of the fixed mission (tell-the-robot phase 4): `./run.sh g1-skills`, or with your own script `SEED=3 ROBOT_SCRIPT="look_around; pick red can; place table_a" ./run.sh g1-skills`. See `skills.yml` and `../tell-the-robot/PHASE-4.md`.
+
 A random room with more objects on the tables (tell-the-robot phase 3): `SEED=7 ./run.sh g1-pick-place`. The robot still fetches the blue bottle; the Rerun **memory** panel lists everything it has seen.
 
 To check it without a window: it runs about 10x faster than real time and ends with PASS or FAIL.
