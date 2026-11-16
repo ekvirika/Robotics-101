@@ -1,0 +1,97 @@
+# Lesson 4: the Unitree G1 crosses a square full of walking people.
+#
+#   sim ──scan (10 Hz)──▶ tracker ──tracks──▶ planner ──cmd_vel──▶ locomotion ─┐
+#    ▲ └──base_pose (50 Hz)──▶ tracker, planner                                │
+#    ├──────────────────────── joint commands (legs + waist) ◀─────────────────┘
+#    └── joint commands (arms + hands) ◀── arm        (low_state goes to both)
+#
+# `locomotion` and `arm` are lesson 3's programs, used as they are.
+# Run from the repository root:  ./run.sh g1-crowd
+
+strict_types: true # a type mismatch between two nodes is an error
+
+env: # given to every node
+  # so every node can `import crowd` (this lesson) and `import g1` (lesson 3's robot software)
+  PYTHONPATH: .:../03-g1-pick-place
+
+nodes:
+  - id: sim
+    name: robot + square + people
+    description: MuJoCo physics at 500 Hz, the G1's motors and sensors, its lidar, the people, 3D window. On hardware this is the G1 itself.
+    path: uv
+    args: run --no-sync mjpython -u nodes/sim.py
+    inputs:
+      tick: dora/timer/millis/2 # one physics step every 2 ms
+      lower_body_cmd: locomotion/joint_command
+      upper_body_cmd: arm/joint_command
+      tracks: tracker/tracks # only to draw the red rings
+    outputs:
+      - low_state # joint angles and speeds, IMU
+      - base_pose # where the robot is (on hardware: localization)
+      - scan # the lidar
+    output_types:
+      low_state: std/core/v1/Float64
+      base_pose: std/core/v1/Float64
+      scan: std/core/v1/Float64
+    env:
+      SCENE: world/square.xml
+      START: "-5,0,0" # the robot starts on the west side (x, y, heading)
+      PEOPLE: 16
+      SEED: 0 # which random crowd; another number gives another crowd
+
+  - id: tracker
+    description: finds the people in each lidar scan and follows them (crowd/tracker.py)
+    path: uv
+    args: run --no-sync python -u nodes/tracker.py
+    inputs:
+      scan: sim/scan
+      base_pose: sim/base_pose
+    outputs:
+      - tracks
+    output_types:
+      tracks: std/core/v1/Float64
+
+  - id: planner
+    description: picks a walking velocity toward the goal that keeps clear of people (crowd/planner.py)
+    path: uv
+    args: run --no-sync python -u nodes/planner.py
+    inputs:
+      tracks: tracker/tracks
+      base_pose: sim/base_pose
+    outputs:
+      - cmd_vel
+    output_types:
+      cmd_vel: std/core/v1/Float64
+    env:
+      GOAL: "5,0" # the green mark on the east side (x, y)
+
+  - id: locomotion
+    description: lesson 3's program, unchanged. Walks with Unitree's trained policy, or stands and balances
+    path: uv
+    args: run --no-sync python -u ../03-g1-pick-place/nodes/locomotion.py
+    inputs:
+      low_state: sim/low_state
+      cmd_vel: planner/cmd_vel
+    outputs:
+      - joint_command # legs + waist
+      - standing
+    output_types:
+      joint_command: std/core/v1/Float64
+      standing: std/core/v1/Float64
+    env:
+      POLICY: ../03-g1-pick-place/policies/g1_walk.onnx
+
+  - id: arm
+    description: lesson 3's program, unchanged. Gets no commands here, so it holds the arms in the walking pose
+    path: uv
+    args: run --no-sync python -u ../03-g1-pick-place/nodes/arm.py
+    inputs:
+      low_state: sim/low_state
+    outputs:
+      - joint_command # arms + hands
+      - arm_status
+    output_types:
+      joint_command: std/core/v1/Float64
+      arm_status: std/core/v1/Float64
+    env:
+      ROBOT: ../03-g1-pick-place/robot/g1_with_hands.xml

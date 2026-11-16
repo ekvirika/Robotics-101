@@ -24,6 +24,7 @@ folder_of() {
     arm) echo extras/simulations/arm ;;
     arm-nodes) echo humanoid/02-dora-nodes ;;
     g1-pick-place) echo humanoid/03-g1-pick-place ;;
+    g1-crowd) echo humanoid/04-g1-crowd ;;
     *) echo "" ;;
   esac
 }
@@ -44,6 +45,7 @@ usage() {
   echo "  humanoid track:"
   echo "    arm-nodes      lesson 2: the MuJoCo arm as 7 dora nodes (3D window + Rerun charts)"
   echo "    g1-pick-place  lesson 3: the Unitree G1 walks, picks up a bottle, puts it on another table"
+  echo "    g1-crowd       lesson 4: the Unitree G1 crosses a square full of walking people"
 }
 
 die() { printf '\033[0;31mERROR: %s\033[0m\n' "$*" >&2; exit 1; }
@@ -60,7 +62,7 @@ dir="$(folder_of "$name")"
 
 case "$name" in
   yolo|fake-camera|robust) uv sync --quiet --extra vision ;;
-  arm-nodes|g1-pick-place) uv sync --quiet --extra sim ;;
+  arm-nodes|g1-pick-place|g1-crowd) uv sync --quiet --extra sim ;;
   *) uv sync --quiet ;;
 esac
 

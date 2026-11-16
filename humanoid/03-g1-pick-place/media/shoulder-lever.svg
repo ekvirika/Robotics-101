@@ -1,0 +1,31 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="900" height="520" viewBox="0 0 900 520" font-family="Helvetica, Arial, sans-serif">
+<title>Where the shoulder's extra torque comes from</title>
+<defs><marker id="h11151B" orient="auto" markerWidth="5" markerHeight="5" refX="2" refY="2" overflow="visible"><path d="M0 0 L4 2 L0 4 Z" fill="#11151B"/></marker><marker id="h5C6473" orient="auto" markerWidth="5" markerHeight="5" refX="2" refY="2" overflow="visible"><path d="M0 0 L4 2 L0 4 Z" fill="#5C6473"/></marker><marker id="h2457C5" orient="auto" markerWidth="5" markerHeight="5" refX="2" refY="2" overflow="visible"><path d="M0 0 L4 2 L0 4 Z" fill="#2457C5"/></marker><marker id="hC9641A" orient="auto" markerWidth="5" markerHeight="5" refX="2" refY="2" overflow="visible"><path d="M0 0 L4 2 L0 4 Z" fill="#C9641A"/></marker><marker id="h2A9D8F" orient="auto" markerWidth="5" markerHeight="5" refX="2" refY="2" overflow="visible"><path d="M0 0 L4 2 L0 4 Z" fill="#2A9D8F"/></marker></defs>
+<rect width="900" height="520" fill="#F7F6F2"/>
+<text x="40.0" y="40.0" font-size="20" fill="#11151B" text-anchor="start" font-weight="bold">The right shoulder at 7.6 s: torque = weight × lever</text>
+<line x1="330.0" y1="80.0" x2="330.0" y2="470.0" stroke="#5C6473" stroke-width="2" stroke-linecap="round" stroke-dasharray="8 6"/>
+<line x1="330.0" y1="110.0" x2="240.0" y2="250.0" stroke="#B9B4A8" stroke-width="18" stroke-linecap="round"/>
+<line x1="240.0" y1="250.0" x2="300.0" y2="350.0" stroke="#B9B4A8" stroke-width="14" stroke-linecap="round"/>
+<circle cx="305.0" cy="360.0" r="16" fill="#B9B4A8"/>
+<circle cx="330.0" cy="110.0" r="16" fill="#F7F6F2" stroke="#11151B" stroke-width="5"/>
+<circle cx="262.0" cy="266.0" r="18" fill="#11151B" stroke="#F7F6F2" stroke-width="4"/>
+<line x1="262.0" y1="290.0" x2="262.0" y2="416.0" stroke="#C9641A" stroke-width="5" stroke-linecap="round" marker-end="url(#hC9641A)"/>
+<line x1="262.0" y1="470.0" x2="330.0" y2="470.0" stroke="#2457C5" stroke-width="4" stroke-linecap="round"/>
+<line x1="262.0" y1="460.0" x2="262.0" y2="480.0" stroke="#2457C5" stroke-width="4" stroke-linecap="round"/>
+<line x1="330.0" y1="460.0" x2="330.0" y2="480.0" stroke="#2457C5" stroke-width="4" stroke-linecap="round"/>
+<text x="356.0" y="116.0" font-size="15" fill="#11151B" text-anchor="start" font-weight="normal">shoulder axis</text>
+<text x="234.0" y="264.0" font-size="15" fill="#11151B" text-anchor="end" font-weight="normal">center of mass</text>
+<text x="234.0" y="284.0" font-size="15" fill="#11151B" text-anchor="end" font-weight="normal">of the whole arm</text>
+<text x="246.0" y="376.0" font-size="15" fill="#C9641A" text-anchor="end" font-weight="bold">weight 39.7 N</text>
+<text x="296.0" y="500.0" font-size="15" fill="#2457C5" text-anchor="middle" font-weight="bold">lever 3.79 cm</text>
+<text x="400.0" y="300.0" font-size="15" fill="#5C6473" text-anchor="start" font-weight="normal">front →</text>
+<text x="40.0" y="500.0" font-size="13" fill="#5C6473" text-anchor="start" font-weight="normal">(not to scale)</text>
+<text x="520.0" y="120.0" font-size="15" fill="#5C6473" text-anchor="start" font-weight="normal">Weight</text>
+<text x="520.0" y="144.0" font-size="16" fill="#11151B" text-anchor="start" font-weight="bold">4.046 kg × 9.81 = 39.7 N</text>
+<text x="520.0" y="190.0" font-size="15" fill="#5C6473" text-anchor="start" font-weight="normal">Arm’s center of mass</text>
+<text x="520.0" y="214.0" font-size="16" fill="#11151B" text-anchor="start" font-weight="bold">3.9 cm behind the shoulder</text>
+<text x="520.0" y="260.0" font-size="15" fill="#5C6473" text-anchor="start" font-weight="normal">Shoulder axis tilt</text>
+<text x="520.0" y="284.0" font-size="16" fill="#11151B" text-anchor="start" font-weight="bold">16°, so the lever is 3.79 cm</text>
+<text x="520.0" y="330.0" font-size="15" fill="#5C6473" text-anchor="start" font-weight="normal">Torque</text>
+<text x="520.0" y="354.0" font-size="16" fill="#11151B" text-anchor="start" font-weight="bold">39.7 N × 0.0379 m = 1.50 Nm</text>
+</svg>

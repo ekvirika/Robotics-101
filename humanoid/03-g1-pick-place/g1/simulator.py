@@ -1,4 +1,4 @@
-"""The world in MuJoCo: the G1 with its motor drivers and sensors, two tables, a bottle.
+"""The world in MuJoCo: the G1 with its motor drivers and sensors, in any scene.
 
 On the real robot, each motor has a small computer (the motor driver) that
 gets a command (target angle, kp, kd, extra torque) and turns it into torque
@@ -22,7 +22,7 @@ def yaw_of(quat):
 class Simulator:
     def __init__(self, scene_path, start=(0.0, 0.0, 0.0)):
         """start: where the robot stands at the beginning, (x, y, heading)."""
-        self.model = mujoco.MjModel.from_xml_path(scene_path)
+        self.model = self.load_model(scene_path)
         self.data = mujoco.MjData(self.model)
         joints = [self.model.joint(name).id for name in robot.JOINTS]
         self.qpos_index = self.model.jnt_qposadr[joints]
@@ -34,8 +34,9 @@ class Simulator:
         self.gyro = self.model.sensor_adr[
             self.model.sensor("imu-pelvis-angular-velocity").id
         ]
-        bottle = self.model.joint("bottle")
-        self.bottle_qpos = self.model.jnt_qposadr[bottle.id]
+        # the bottle is optional: scenes without one just have no bottle_pose
+        bottle = mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_JOINT, "bottle")
+        self.bottle_qpos = self.model.jnt_qposadr[bottle] if bottle >= 0 else None
 
         # motor commands, one entry per joint (zero gains = motor off)
         self.target = np.zeros(robot.NUM_JOINTS)
@@ -43,6 +44,10 @@ class Simulator:
         self.kd = np.zeros(robot.NUM_JOINTS)
         self.tau = np.zeros(robot.NUM_JOINTS)
         self._stand_at(*start)
+
+    def load_model(self, scene_path):
+        """The MuJoCo model of the scene. Other worlds override this to add things."""
+        return mujoco.MjModel.from_xml_path(scene_path)
 
     def _stand_at(self, x, y, heading):
         """Put the robot in its standing pose, feet on the floor, motors holding it."""
@@ -64,10 +69,12 @@ class Simulator:
         self.data.qpos[self.qpos_index] = pose
         mujoco.mj_kinematics(self.model, self.data)
         # lower the robot until its lowest foot point touches the floor
+        # (each foot touches the ground with four small spheres)
         feet = [
             g
             for g in range(self.model.ngeom)
             if self.model.geom_type[g] == mujoco.mjtGeom.mjGEOM_SPHERE
+            and "ankle_roll" in self.model.body(self.model.geom_bodyid[g]).name
         ]
         lowest = min(
             self.data.geom_xpos[g][2] - self.model.geom_size[g][0] for g in feet
