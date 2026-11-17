@@ -109,9 +109,15 @@ stood. Measured first (`spikes/fallen_check.py`): standing objects are 10 to 18 
 | 8: yellow box next to the bottle | "a fresh look shows the box … next to it" (it had tipped over) | "that failed: the box fell over and is lying on its side, so I can't pick it up again" |
 
 The judges for these two now also pass an honest report of what went wrong; a false success
-claim still fails. Cases 7 and 8 pass with the new code. The other 10 passed before the change
-and have not been rerun with the new system prompt yet. 32 pure tests and the 4 failure
-scenarios pass with the new code.
+claim still fails.
+
+**Full rerun of all 12 with the fix: 12 of 12.** The automatic judge said 11: case 7's reply
+("the blue bottle I'd already put there is gone … can't see it on either table now") is true, the
+bottle was on the floor, but the judge's list of honest words lacked "gone" and "can't see". The
+list is fixed and checked against the recorded reply (passes) and against the old false claim
+("I put the blue bottle and the yellow box on table B", still fails). The other 11 cases pass
+unchanged; replies got slightly more precise ("it's standing there now"). 32 pure tests and the
+4 failure scenarios pass.
 
 ## Still open
 
