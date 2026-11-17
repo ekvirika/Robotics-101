@@ -11,3 +11,4 @@ MUJOCO_LOG.TXT
 humanoid/03-g1-pick-place/robot/scene_seed*.xml
 *.pt
 humanoid/03-g1-pick-place/robot/scene_live.xml
+.env

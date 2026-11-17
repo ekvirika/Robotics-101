@@ -9,10 +9,12 @@ humanoid/tell-the-robot/demo.sh g1-agent --stop-after 120s   # robot + windows, 
 cd humanoid/03-g1-pick-place && uv run --no-sync python nodes/chat.py   # second terminal: talk to it
 ```
 
-Through Exxeta's LiteLLM proxy (allowed for this project) the environment needs
-`ANTHROPIC_BASE_URL=https://ai.exxeta.info`, `ANTHROPIC_AUTH_TOKEN` (your proxy token, in
-`~/.zshrc`, never in the repo) and `AGENT_MODEL=claude-opus-5.5` (the proxy writes model names
-with a dot). Straight against Anthropic: only `ANTHROPIC_API_KEY`.
+Through Exxeta's LiteLLM proxy (allowed for this project) the run needs
+`ANTHROPIC_BASE_URL=https://ai.exxeta.info`, `ANTHROPIC_AUTH_TOKEN` (your proxy token) and
+`AGENT_MODEL=claude-opus-5.5` (the proxy writes model names with a dot). They go in `.env` at the
+top of the repository (git-ignored, template in `.env.example`); `run.sh` loads it for its own
+run only, so the token never reaches the shell or other projects. Straight against Anthropic:
+only `ANTHROPIC_API_KEY`, in the same file.
 
 ## What was added
 
@@ -78,8 +80,9 @@ and tools stay valid.
 - **A proxy changes names, not the code.** Exxeta's LiteLLM proxy takes `claude-opus-5.5` (dot,
   not dash), passes tools, thinking, effort and even the fallback beta. One cheap probe request
   before the evaluation found the name.
-- **A key in a chat is a leaked key.** Keys go into `~/.zshrc` by the user's own hand, and get
-  regenerated if they ever appear in a conversation.
+- **A key in a chat is a leaked key.** Keys go into the git-ignored `.env` by the
+  user's own hand, and get regenerated if they ever appear in a conversation. Not `~/.zshrc`: a
+  global `ANTHROPIC_*` variable also redirects every other tool that reads it.
 - **Live windows are the heaviest load.** The live demo with the MuJoCo window and Rerun used 3.6
   cores plus the GPU; the Mac got hot before macOS recorded any warning. Now: window 30 frames
   per second (`DRAW_FPS`), head camera 10 images per second (`CAMERA_HZ`), dashboard images 2 per

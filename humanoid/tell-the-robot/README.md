@@ -17,8 +17,8 @@ https://claude.ai/artifact/DdS7HDAMjuHDou7pkupu7K
 
 Two terminals, both from the top folder of the repository.
 
-Terminal 1, the robot, its 3D window and the Rerun dashboard. Claude needs an Anthropic API key in
-the environment (`ANTHROPIC_API_KEY`):
+Terminal 1, the robot, its 3D window and the Rerun dashboard. Claude needs a key in `.env` at the top of
+the repository (git-ignored; copy `.env.example`, fill in the proxy token or an `ANTHROPIC_API_KEY`):
 
 ```bash
 humanoid/tell-the-robot/demo.sh g1-agent --stop-after 600s

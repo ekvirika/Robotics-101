@@ -6,6 +6,8 @@
 set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$ROOT"
+# keys for this project only (.env.example): exported to this run, never to the shell
+if [[ -f .env ]]; then set -a; source .env; set +a; fi
 
 folder_of() {
   case "$1" in
@@ -48,7 +50,7 @@ usage() {
   echo "    arm-nodes      lesson 2: the MuJoCo arm as 7 dora nodes (3D window + Rerun charts)"
   echo "    g1-pick-place  lesson 3: the Unitree G1 walks, picks up a bottle, puts it on another table"
   echo "    g1-crowd       lesson 4: the Unitree G1 crosses a square full of walking people"
-  echo "    g1-agent       tell the robot in words: Claude plans with the skills (needs ANTHROPIC_API_KEY);"
+  echo "    g1-agent       tell the robot in words: Claude plans with the skills (needs a key in .env, see .env.example);"
   echo "                   then talk in a second terminal: cd humanoid/03-g1-pick-place && uv run --no-sync python nodes/chat.py"
   echo "    g1-skills      tell the robot: skills from a script, ROBOT_SCRIPT=\"look_around; pick red can; place mark\" SEED=3"
 }

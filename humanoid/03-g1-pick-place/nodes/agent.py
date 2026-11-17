@@ -19,7 +19,7 @@ Outputs: command   JSON text, one skill, to skills
 
 AGENT_SCRIPT (agent.yml) or ROBOT_SAY (shell, wins): sentences separated by "|", sent one after
 another when the robot is idle
-(automatic runs without typing). Needs ANTHROPIC_API_KEY in the environment.
+(automatic runs without typing). Needs a key: run.sh loads it from the repository's .env (.env.example).
 """
 
 import json

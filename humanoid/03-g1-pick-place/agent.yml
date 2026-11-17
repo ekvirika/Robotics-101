@@ -8,7 +8,7 @@
 #        +-----result--------+   <--objects-- world <--seen-- detector <--rgb, depth--/
 #
 # Run: ./run.sh g1-agent, then in a second terminal: uv run --no-sync python nodes/chat.py
-# Needs ANTHROPIC_API_KEY. SEED=<n> for a random room.
+# Needs a key in the repository's .env (see .env.example). SEED=<n> for a random room.
 
 strict_types: true # a type mismatch between two nodes is an error
 
