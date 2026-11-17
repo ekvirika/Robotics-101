@@ -18,7 +18,8 @@ MODEL = "mlx-community/whisper-small.en-mlx"
 SAMPLE_RATE = 16000  # Hz, what Whisper expects
 VOCABULARY = "Put the blue bottle on the green mark. Table A, table B. Red, yellow, green, blue. Bottle, can, box. Stop."
 TOO_SHORT = 0.3  # s: a tap of the key, not a sentence
-TOO_QUIET = 0.005  # RMS of float audio in -1..1: nothing was said
+TOO_QUIET = 0.001  # RMS of float audio in -1..1: nothing was said (a headset mic speaking is about 0.004)
+MIC = "MacBook"  # the built-in mic; a Bluetooth headset may be the default input and is quiet
 
 
 def transcribe(audio, model=MODEL):
@@ -27,7 +28,7 @@ def transcribe(audio, model=MODEL):
 
     if isinstance(audio, np.ndarray):
         audio = audio.astype(np.float32).ravel()
-        if len(audio) < TOO_SHORT * SAMPLE_RATE or np.sqrt(np.mean(audio**2)) < TOO_QUIET:
+        if len(audio) < TOO_SHORT * SAMPLE_RATE or level(audio) < TOO_QUIET:
             return ""
     result = mlx_whisper.transcribe(
         audio if isinstance(audio, np.ndarray) else str(audio),
@@ -45,18 +46,35 @@ def normalized(text):
     return " ".join(re.sub(r"[^a-z0-9' ]", " ", text.lower()).split())
 
 
+def microphone(name=MIC):
+    """(index, name) of the first input device whose name contains `name`, else the default input."""
+    import sounddevice
+
+    inputs = [(i, d["name"]) for i, d in enumerate(sounddevice.query_devices()) if d["max_input_channels"]]
+    for i, found in inputs:
+        if name and name.lower() in found.lower():
+            return i, found
+    default = sounddevice.query_devices(kind="input")
+    return None, default["name"]
+
+
+def level(audio):
+    """RMS of float audio: 0 is silence, speech close to a laptop mic is about 0.02 to 0.1."""
+    return float(np.sqrt(np.mean(audio**2))) if len(audio) else 0.0
+
+
 class Recorder:
     """Push-to-talk: start() opens the microphone, stop() closes it and returns the audio."""
 
-    def __init__(self):
-        self.chunks, self.stream = [], None
+    def __init__(self, device=None):
+        self.device, self.chunks, self.stream = device, [], None
 
     def start(self):
         import sounddevice
 
         self.chunks = []
         self.stream = sounddevice.InputStream(
-            samplerate=SAMPLE_RATE, channels=1, dtype="float32", callback=lambda data, *_: self.chunks.append(data.copy())
+            device=self.device, samplerate=SAMPLE_RATE, channels=1, dtype="float32", callback=lambda data, *_: self.chunks.append(data.copy())
         )
         self.stream.start()
 

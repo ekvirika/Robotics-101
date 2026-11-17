@@ -52,6 +52,12 @@ every language, small.en only English, and it guesses less under noise.
 - **Show the truth beside the belief.** Grey boxes are where the objects really are, tilted when
   they fell over; colored boxes are the robot's memory. The audience sees perception errors
   without anyone explaining them.
+- **The default input is not always the laptop.** A paired Bluetooth headset (ACCENTUM) became
+  the default microphone and recorded at RMS 0.004, under the old 0.005 silence cut, so every
+  sentence came back empty. The chat now picks the MacBook's microphone by name (`CHAT_MIC`),
+  prints which one it opened, the cut is 0.001, and “heard nothing” shows the seconds and level.
+- **Click the chat terminal before pressing Enter.** With the MuJoCo or Rerun window in front,
+  Enter goes there and no recording starts.
 
 ## Not measured yet
 
