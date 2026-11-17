@@ -83,7 +83,10 @@ and tools stay valid.
 - **Live windows are the heaviest load.** The live demo with the MuJoCo window and Rerun used 3.6
   cores plus the GPU; the Mac got hot before macOS recorded any warning. Now: window 30 frames
   per second (`DRAW_FPS`), head camera 10 images per second (`CAMERA_HZ`), dashboard images 2 per
-  second (`IMAGE_EVERY`), and `demo.sh` stops a demo above 3 cores for 20 s.
+  second (`IMAGE_EVERY`), and `demo.sh` stops a demo above 3 cores for 20 s. Measured with
+  `demo.sh g1-skills`, look around: median 1.8 cores (was 3.6), peak 2.8, still 100% of real
+  time, and the Mac stayed cool. The Rerun window itself is the biggest part, 1.2 cores while
+  drawing, then the physics, 1.1.
 
 ## Still open
 
@@ -92,7 +95,6 @@ and tools stay valid.
 - **Live demo, room 2:** `look_around` missed the yellow can that the headless evaluation found.
   Claude answered honestly ("couldn't find a yellow can"). Detection while live needs more looks
   per view, or a third viewpoint.
-- The lighter demo is not measured yet.
 
 ## Exercises
 
