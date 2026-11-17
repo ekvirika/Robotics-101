@@ -416,6 +416,8 @@ class Pick(Skill):
         if obj is None:
             return Result(False, f"I don't know object #{self.object_id}; look around first")
         self.what = f"#{obj['id']} {obj['color']} {obj['kind'] or 'object'}"
+        if obj.get("standing") is False:
+            return Result(False, f"can't pick {self.what}: it is lying on its side, the hand only grasps standing objects")
         options, reason = reach.grasp_options(obj["position"], r.others(but=self.object_id))
         if not options:
             return Result(False, f"can't pick {self.what}: {reason}")
@@ -530,7 +532,7 @@ class Place(Skill):
         """The steps to put the held object down at one option (a spot and where to stand)."""
         self.option = option
         self.neighbors = {
-            o["id"]: np.array(o["position"])
+            o["id"]: (np.array(o["position"]), o.get("standing", True))
             for o in r.objects
             if o["id"] != r.held and np.hypot(*(np.array(o["position"][:2]) - option.spot)) < NEIGHBORHOOD
         }
@@ -553,7 +555,7 @@ class Place(Skill):
             ("arm", messages.REST, None, "arm down"),
             ("do", lambda r: setattr(r, "arm_area", None), "arm done"),
             ("do", self._mark_look, "remember when I looked"),
-            ("look", 1.5, "look where I put it"),
+            ("look", 2.5, "look where I put it"),
             ("check", self._there, "check it stands there"),
         ]
 
@@ -615,19 +617,31 @@ class Place(Skill):
     def _there(self, r):
         """Seen at the spot *after* letting go. The memory was told where it was put, so
         only a fresh sighting proves it (last_seen after the look started)."""
+        lying = False
         for o in r.objects:
             fresh = o.get("last_seen", 0.0) >= self.looked_from
-            if fresh and np.hypot(*(np.array(o["position"][:2]) - self.option.spot)) < 0.05:
-                return None
+            near = np.hypot(*(np.array(o["position"][:2]) - self.option.spot)) < (0.05 if o.get("standing", True) else 0.12)
+            if fresh and near:
+                if o.get("standing", True):
+                    return None
+                lying = True
+        if lying:
+            return f"{self.what} fell over: it lies on its side where I put it down"
         return f"{self.what} is not where I put it: I don't see it there"
 
     def success(self, r):
         message = f"put {self.what} {self.where if isinstance(self.target, tuple) else 'on ' + self.where}"
         moved = []
-        for object_id, before in self.neighbors.items():
+        for object_id, (before, stood) in self.neighbors.items():
             now = r.object(object_id)
             if now is None:
                 moved.append(f"#{object_id} is gone")
+                continue
+            if stood and now.get("standing", True) is False:
+                moved.append(f"#{object_id} {now['color']} {now['kind'] or 'object'} fell over")
+                continue
+            if now.get("last_seen", 0.0) < self.looked_from:
+                moved.append(f"I can't see #{object_id} {now['color']} {now['kind'] or 'object'} anymore, it may have been knocked off")
                 continue
             shift = np.hypot(*(np.array(now["position"][:2]) - before[:2]))
             if shift > DISTURBED:

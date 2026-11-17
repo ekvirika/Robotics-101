@@ -90,3 +90,14 @@ def test_held_object_follows_the_hand_and_is_never_missing():
     assert list(world.objects) == [1]
     world.release((1.0, -1.52, 0.875))
     assert world.held is None and np.isclose(world.objects[1].position[1], -1.52)
+
+
+def test_a_fallen_bottle_keeps_its_id_and_kind_and_is_lying():
+    world = World()
+    world.update(0.0, [seen(1.4, 0.0)], always)
+    fallen = Seen(None, "blue", np.array([1.49, 0.03, 0.83]), 400, (0, 0, 1, 1), False, 0.062)
+    world.update(1.0, [fallen], always)
+    assert list(world.objects) == [1]
+    obj = world.as_list()[0]
+    assert obj["kind"] == "bottle" and obj["standing"] is False
+    assert np.isclose(obj["position"][0], 1.49)  # a fall is a jump, not smoothed

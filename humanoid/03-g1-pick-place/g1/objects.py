@@ -11,8 +11,12 @@ the depth image and the colors inside the box:
   color   the hue of its saturated pixels, the nearest of the four colors
   center  round kinds: fit a circle to the side (perception.cylinder_center);
           box: the middle of its top face. Height: the table plus half the object
+  posture standing, or lying on its side: every standing object is at least 10 cm
+          high, every lying one at most 6.8 cm (measured, spikes/fallen_check.py).
+          A lying object's height says nothing about its kind (all about 6 cm), so its
+          kind is unknown here; the memory keeps the kind it saw while it stood.
 
-Unknown kind: when the box touches the image's top edge, the top may be cut off.
+Unknown kind and posture: when the box touches the image's top edge, the top may be cut off.
 """
 
 from dataclasses import dataclass
@@ -28,6 +32,8 @@ CLUSTER = 0.06  # m: points this far from the cluster's middle belong to somethi
 MIN_POINTS = 40
 EDGE = 2  # pixels
 TOPS = {"bottle": 0.18, "can": 0.12, "box": 0.10}  # m, highest point above the table
+LYING_BELOW = 0.08  # m: a top lower than this is an object on its side (standing >= 10 cm, lying <= 6.8 cm)
+LYING_CENTER = 0.03  # m above the table: the axis of a cylinder lying on its side
 HUES = {"red": 0.0, "yellow": 50.0, "green": 130.0, "blue": 210.0}  # degrees
 MIN_SATURATION = 0.45
 
@@ -39,10 +45,12 @@ class Seen:
     position: np.ndarray  # center, room frame
     points: int
     box: tuple  # (u1, v1, u2, v2) in the image
+    standing: bool | None = True  # False: lying on its side; None: top cut off, can't tell
+    top: float = 0.0  # m, highest point above the table
 
     @property
     def label(self):
-        return f"{self.color} {self.kind or 'object'}"
+        return f"{self.color} {self.kind or 'object'}" + ("" if self.standing is not False else " (lying)")
 
 
 def nearest_kind(top):
@@ -94,12 +102,17 @@ def describe(box, rgb, depth, fx, fy, cx, cy, cam_position, cam_rotation):
 
     top_cut_off = v.min() < EDGE
     top = np.percentile(world[:, 2], 99) - TABLE_TOP
-    kind = None if top_cut_off else nearest_kind(top)
+    standing = None if top_cut_off else bool(top >= LYING_BELOW)
+    kind = nearest_kind(top) if standing else None
 
     hue, saturation, _ = perception.hsv(rgb[v, u][None])
     colored = saturation[0] > MIN_SATURATION
     color = nearest_color(hue[0][colored]) if colored.any() else "unknown"
 
+    if standing is False:
+        xy = world[:, :2].mean(axis=0)
+        position = np.array([xy[0], xy[1], TABLE_TOP + LYING_CENTER])
+        return Seen(None, color, position, len(world), (u1, v1, u2, v2), False, float(top))
     if kind == "box":
         top_face = world[world[:, 2] > world[:, 2].max() - 0.01]
         xy = top_face[:, :2].mean(axis=0)
@@ -109,7 +122,7 @@ def describe(box, rgb, depth, fx, fy, cx, cy, cam_position, cam_rotation):
         xy = perception.cylinder_center(side if len(side) > 10 else world, cam_position, radius)
     half = scenes.SHAPES[kind or "bottle"][1]
     position = np.array([xy[0], xy[1], TABLE_TOP + half])
-    return Seen(kind, color, position, len(world), (u1, v1, u2, v2))
+    return Seen(kind, color, position, len(world), (u1, v1, u2, v2), standing, float(top))
 
 
 SAME_OBJECT = 0.05  # m: two sightings in one image closer than this are one object
@@ -152,8 +165,10 @@ def to_dict(seen):
         "position": [round(float(v), 4) for v in seen.position],
         "points": int(seen.points),
         "box": [int(v) for v in seen.box],
+        "standing": seen.standing,
+        "top": round(float(seen.top), 3),
     }
 
 
 def from_dict(d):
-    return Seen(d["kind"], d["color"], np.array(d["position"]), d["points"], tuple(d["box"]))
+    return Seen(d["kind"], d["color"], np.array(d["position"]), d["points"], tuple(d["box"]), d.get("standing", True), d.get("top", 0.0))

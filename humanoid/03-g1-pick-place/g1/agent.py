@@ -47,7 +47,7 @@ The room:
 
 What the robot can do:
 - look_around: walks to two viewpoints and looks at both tables; the memory fills up
-- get_objects: what the memory holds now: id, color, kind, position, whether it can be picked and why not, what is in the hand
+- get_objects: what the memory holds now: id, color, kind, position, standing or lying on its side, whether it can be picked and why not, what is in the hand
 - pick(object_id): walks to the best table side, grasps, lifts; one hand, one object at a time
 - place(target): puts the held object on table_a, table_b, the mark, or next to another object (target next_to + next_to_id)
 - go_to(place): start, table_a, table_b, mark
@@ -57,7 +57,9 @@ Rules:
 - If a request matches more than one object (two red cans) or none, ask which one in one short question and stop; don't guess.
 - One robot action at a time: wait for its result before the next.
 - Every result says what happened. If a skill fails, read the reason: try another way when there is one (another object, another place, look_around again), otherwise say what failed and stop. Never say something worked unless its result says so.
-- "but #N moved" or "#N is gone" in a result means something was disturbed: mention it.
+- "but #N moved", "#N fell over" or "#N is gone" in a result means something was disturbed: mention it.
+- A FAILED result stays failed. Don't explain it away when get_objects later shows the object nearby: it may be lying on its side. Report what the result says.
+- An object lying on its side has fallen over and can't be picked: say so.
 - Your replies are spoken aloud: one or two short sentences, no lists, no markdown. Say what you did or what you need."""
 
 TOOLS = [
@@ -136,12 +138,16 @@ def describe_objects(objects, held):
         if o["id"] == held:
             lines.append(f"#{o['id']} {o['color']} {o['kind'] or 'object'}: in the hand")
             continue
+        posture = "standing" if o.get("standing", True) else "LYING ON ITS SIDE (fell over)"
         others = [x["position"] for x in objects if x["id"] not in (o["id"], held)]
         options, reason = reach.grasp_options(o["position"], others)
         table = reach.table_of(o["position"]) or "no table"
         x, y = o["position"][0], o["position"][1]
-        can = "can be picked" if options else f"can't be picked: {reason}"
-        lines.append(f"#{o['id']} {o['color']} {o['kind'] or 'object'} on {table} at ({x:.2f}, {y:.2f}): {can}")
+        if not o.get("standing", True):
+            can = "can't be picked: it lies on its side, the hand only grasps standing objects"
+        else:
+            can = "can be picked" if options else f"can't be picked: {reason}"
+        lines.append(f"#{o['id']} {o['color']} {o['kind'] or 'object'} on {table} at ({x:.2f}, {y:.2f}), {posture}: {can}")
     lines.append(f"In the hand: #{held}" if held is not None else "The hand is empty.")
     return "\n".join(lines)
 
@@ -155,6 +161,8 @@ def check_call(call, objects, held):
             return f"The hand already holds #{held}. Place it first."
         if object_id not in ids:
             return f"There is no object #{object_id} in the memory. Call get_objects (or look_around) and use an id from it."
+        if next(o for o in objects if o["id"] == object_id).get("standing", True) is False:
+            return f"#{object_id} lies on its side: the hand only grasps standing objects."
     if call.name == "place":
         if held is None:
             return "The hand is empty. Pick something first."

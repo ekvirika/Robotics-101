@@ -138,3 +138,14 @@ def test_without_fallbacks_no_beta_parameters_are_sent():
     sent = model.sent[0]
     assert "betas" not in sent and "fallbacks" not in sent
     assert sent["model"] == "claude-opus-4-8" and sent["thinking"] == {"type": "adaptive"}
+
+
+LYING = [{**OBJECTS[0], "standing": False}, OBJECTS[1]]
+
+
+def test_lying_objects_are_shown_as_fallen_and_cannot_be_picked():
+    text = agent.describe_objects(LYING, None)
+    assert "#1 blue bottle" in text and "LYING ON ITS SIDE" in text and "only grasps standing objects" in text
+    problem = agent.check_call(agent.Call("x", "pick", {"object_id": 1}), LYING, None)
+    assert "lies on its side" in problem
+    assert agent.check_call(agent.Call("x", "pick", {"object_id": 2}), LYING, None) is None

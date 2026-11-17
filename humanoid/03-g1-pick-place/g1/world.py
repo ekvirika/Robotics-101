@@ -19,6 +19,10 @@ Each update does three things:
 Ids never change and are never reused, so "object 3" means the same thing to
 every node, and later to the language model.
 
+Standing or lying comes from the latest sighting that could tell (objects.py).
+A lying sighting has no kind; it may match the same-colored object further away
+(FALLEN_GATE), so a fallen bottle keeps its id and stays a bottle.
+
 The object in the hand (hold / release, told by the skills) is special: it
 moves with the hand, so sightings near it update it instead of making a new
 object, and it is never counted as missing from where it used to stand.
@@ -35,6 +39,7 @@ MISSES_TO_FORGET = 3
 IMAGE_MARGIN = 20  # pixels: near the image edge, an object may be half outside
 HIDDEN = 0.05  # m: something this much nearer in the depth image covers the object
 ARM_AREA = 0.3  # m: around where the arm works, the robot's own hand hides objects
+FALLEN_GATE = 0.15  # m: a lying sighting may be this far from where the object stood (a bottle's center moves ~9 cm when it falls)
 HELD_RADIUS = 0.2  # m: a sighting this close to the held object, same color, is the held object
 MAX_RANGE = 2.5  # m: further away, the detector may miss it, don't count as missing
 AXIS = (-0.05, -0.025, 0.0, 0.025, 0.05)  # m above / below the center: points checked up the object
@@ -51,6 +56,7 @@ class Remembered:
     colors: Counter = field(default_factory=Counter)
     misses: int = 0
     sightings: int = 0
+    standing: bool = True  # from the latest sighting that could tell
 
     @property
     def kind(self):
@@ -72,6 +78,7 @@ class Remembered:
             "position": [round(float(v), 4) for v in self.position],
             "last_seen": round(self.last_seen, 2),
             "sightings": self.sightings,
+            "standing": self.standing,
         }
 
 
@@ -121,7 +128,7 @@ class World:
                 if obj.color is not None and s.color != obj.color:
                     continue
                 distance = np.hypot(*(s.position[:2] - obj.position[:2]))
-                if distance <= GATE:
+                if distance <= (FALLEN_GATE if s.standing is False else GATE):
                     pairs.append((distance, i, obj.id))
         used_seen, used_objects, matches = set(), set(), []
         for _, i, object_id in sorted(pairs):
@@ -145,7 +152,11 @@ class World:
 
         for i, object_id in matches:
             obj, s = self.objects[object_id], seen[i]
-            obj.position = obj.position + SMOOTHING * (s.position - obj.position)
+            if s.standing is not None and s.standing != obj.standing:
+                obj.position = s.position.copy()  # it fell or was stood up: a jump, not noise
+                obj.standing = s.standing
+            else:
+                obj.position = obj.position + SMOOTHING * (s.position - obj.position)
             obj.last_seen = time
             obj.misses = 0
             obj.sightings += 1
@@ -156,7 +167,7 @@ class World:
         for i, s in enumerate(seen):
             if i in matched_seen:
                 continue
-            obj = Remembered(self.next_id, s.position.copy(), time, time, sightings=1)
+            obj = Remembered(self.next_id, s.position.copy(), time, time, sightings=1, standing=s.standing is not False)
             if s.kind is not None:
                 obj.kinds[s.kind] += 1
             obj.colors[s.color] += 1
