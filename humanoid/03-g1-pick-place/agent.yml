@@ -148,6 +148,9 @@ nodes:
       arm_status: arm/arm_status
       step: skills/status
       conversation: agent/log
+      world_state:
+        source: sim/world_state
+        queue_size: 1
       rgb:
         source: camera/rgb
         queue_size: 1
@@ -209,3 +212,11 @@ nodes:
       reply: agent/reply
     outputs:
       - text
+
+  # the robot's voice: every reply spoken aloud (tell-the-robot phase 6)
+  - id: voice
+    description: speaks every reply with macOS say (VOICE_NAME, VOICE_RATE)
+    path: uv
+    args: run --no-sync python -u nodes/voice.py
+    inputs:
+      reply: agent/reply

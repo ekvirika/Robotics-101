@@ -22,6 +22,10 @@ sim = [
 agent = [  # the language model that plans with the skills, tell-the-robot phase 5
     "anthropic>=0.70",
 ]
+voice = [  # push-to-talk speech to text on Apple Silicon, tell-the-robot phase 6
+    "mlx-whisper>=0.4",
+    "sounddevice>=0.5",
+]
 detect = [  # open-vocabulary detectors for tell-the-robot phase 3
     "ultralytics>=8.3",
     "transformers>=4.46",

@@ -68,7 +68,8 @@ dir="$(folder_of "$name")"
 case "$name" in
   yolo|fake-camera|robust) uv sync --quiet --extra vision ;;
   arm-nodes|g1-crowd) uv sync --quiet --extra sim ;;
-  g1-pick-place|g1-skills|g1-agent) uv sync --quiet --extra sim --extra detect --extra agent ;;
+  g1-pick-place|g1-skills) uv sync --quiet --extra sim --extra detect --extra agent ;;
+  g1-agent) uv sync --quiet --extra sim --extra detect --extra agent --extra voice ;;
   *) uv sync --quiet ;;
 esac
 

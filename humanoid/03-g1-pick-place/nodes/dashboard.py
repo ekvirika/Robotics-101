@@ -15,6 +15,7 @@ Inputs:  base_pose     where the robot is and how far it leans, 50 Hz (sim)
          conversation  what was heard, each tool call and result, each reply (agent, phase 5)
          rgb, depth    the head camera images, 10 Hz (camera)
          cam_pose      where the head camera is, 10 Hz (camera)
+         world_state   every position in the scene, 10 Hz (sim): the true objects, phase 6
          tick          draw timer
 
 The head camera is drawn twice: as a 2D image, and in the 3D room as a
@@ -25,6 +26,12 @@ The tables and the green mark come from robot/scene.xml, so the map always
 matches the simulation.
 
 VIEWER=rerun (default) opens the Rerun window, VIEWER=save writes out/g1.rrd.
+DASHBOARD_LAYOUT=audience (tell-the-robot phase 6) shows only what reads from
+across a room: the 3D room, the head camera and the conversation.
+
+With world_state, every object's true box (grey wireframe, tilted when it fell
+over) is drawn next to the remembered one (colored): where they part, the
+robot is wrong about the world.
 """
 
 import json
@@ -39,6 +46,8 @@ from dora import Node
 from g1 import frames, messages
 from g1.simulator import yaw_of
 
+LAYOUT = os.environ.get("DASHBOARD_LAYOUT", "engineer")
+TRUTH = (150, 150, 150)
 TRAIL_POINTS = 2000  # how much of the walked path to keep (50 Hz: 40 s)
 IMAGE_EVERY = float(os.environ.get("IMAGE_EVERY", "0.49"))  # s of robot time between logged images: every 5th frame of 10 Hz (2 Hz)
 HAND_KINDS = {
@@ -66,6 +75,22 @@ def start_rerun():
         rr.save("out/g1.rrd")
     else:
         rr.init("g1-dashboard", spawn=True)
+    if LAYOUT == "audience":
+        rr.send_blueprint(
+            rrb.Blueprint(
+                rrb.Horizontal(
+                    rrb.Spatial3DView(name="the room: colored = what the robot remembers, grey = the truth", origin="world"),
+                    rrb.Vertical(
+                        rrb.Spatial2DView(name="what the robot sees", origin="world/head_cam"),
+                        rrb.TextLogView(name="conversation", origin="talk"),
+                        row_shares=[1, 1],
+                    ),
+                    column_shares=[3, 2],
+                ),
+                collapse_panels=True,
+            )
+        )
+        return
     rr.send_blueprint(
         rrb.Blueprint(
             rrb.Horizontal(
@@ -93,8 +118,22 @@ def start_rerun():
     )
 
 
+def free_objects(model):
+    """(qpos address, half sizes) of every loose object: each free joint but the robot's."""
+    found = []
+    for j in range(model.njnt):
+        body = model.jnt_bodyid[j]
+        if model.jnt_type[j] != mujoco.mjtJoint.mjJNT_FREE or model.body(body).name == "pelvis":
+            continue
+        geom = model.body_geomadr[body]
+        size = model.geom_size[geom]
+        half = (size[0], size[0], size[1]) if model.geom_type[geom] == mujoco.mjtGeom.mjGEOM_CYLINDER else tuple(size)
+        found.append((model.jnt_qposadr[j], half))
+    return found
+
+
 def log_room(scene_path):
-    """Tables and the place mark, read from the MuJoCo scene. Logged once."""
+    """Tables and the place mark, read from the MuJoCo scene. Logged once. Returns the loose objects."""
     model = mujoco.MjModel.from_xml_path(scene_path)
     data = mujoco.MjData(model)
     mujoco.mj_forward(model, data)
@@ -117,10 +156,11 @@ def log_room(scene_path):
         rr.Points3D([mark], radii=[0.04], colors=[GREEN], labels=["mark"]),
         static=True,
     )
+    return free_objects(model)
 
 
 start_rerun()
-log_room(os.environ["SCENE"])
+loose = log_room(os.environ["SCENE"])
 node = Node()
 
 robot_position = None
@@ -234,6 +274,20 @@ for event in node:
         rr.set_time("sim_time", duration=time)
         level = "DEBUG" if ok else "ERROR"
         rr.log("log", rr.TextLog(f"arm #{command_id}: {'done' if ok else 'failed'}", level=level))
+
+    elif name == "world_state" and loose:
+        state_time, qpos = messages.unpack_world_state(event["value"].to_numpy())
+        rr.set_time("sim_time", duration=state_time)
+        rr.log(
+            "world/truth",
+            rr.Boxes3D(
+                centers=[qpos[a : a + 3] for a, _ in loose],
+                half_sizes=[h for _, h in loose],
+                quaternions=[rr.Quaternion(xyzw=[*qpos[a + 4 : a + 7], qpos[a + 3]]) for a, _ in loose],
+                colors=[TRUTH] * len(loose),
+                radii=[0.002] * len(loose),
+            ),
+        )
 
     elif name == "rgb":
         rgb = (event["value"].to_numpy(), event["metadata"])

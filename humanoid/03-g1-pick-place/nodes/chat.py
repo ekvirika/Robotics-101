@@ -1,31 +1,66 @@
-"""Talk to the robot from a terminal: type a sentence, read its reply.
+"""Talk to the robot from a terminal: type a sentence, or press Enter and speak.
 
 A dynamic dora node: start the dataflow first (./run.sh g1-agent), then in a
 second terminal, from humanoid/03-g1-pick-place:
 
     uv run --no-sync python nodes/chat.py
 
-Type "stop" to stop the robot at once. Ctrl-D or Ctrl-C to leave (the robot keeps running).
+Typing: a sentence, then Enter. Speaking (tell-the-robot phase 6): Enter on an
+empty line starts the microphone, Enter again stops it; Whisper turns it into
+text on this Mac (g1/voice.py) and the text goes to the robot as if typed.
+CHAT_VOICE=0 turns speaking off, WHISPER_MODEL picks the model.
+
+Type or say "stop" to stop the robot at once. Ctrl-D or Ctrl-C to leave (the robot keeps running).
 """
 
+import os
 import sys
 import threading
 
+import numpy as np
 import pyarrow as pa
 from dora import Node
+
+from g1 import voice
+
+SPEAKING = os.environ.get("CHAT_VOICE", "1") != "0"
+MODEL = os.environ.get("WHISPER_MODEL", voice.MODEL)
 
 node = Node("chat")
 
 
+def warm_up():
+    """Load Whisper now, so the first spoken sentence isn't slow."""
+    voice.transcribe(np.full(voice.SAMPLE_RATE, 0.01, np.float32), MODEL)
+
+
 def read_keyboard():
+    recorder = voice.Recorder()
     for line in sys.stdin:
         line = line.strip()
         if line:
             node.send_output("text", pa.array([line]))
+            continue
+        if not SPEAKING:
+            continue
+        voice.hush()
+        recorder.start()
+        print("listening... (Enter to stop)", flush=True)
+        sys.stdin.readline()
+        audio = recorder.stop()
+        heard = voice.transcribe(audio, MODEL)
+        if not heard:
+            print("(heard nothing)", flush=True)
+            continue
+        print(f"you said: {heard}", flush=True)
+        node.send_output("text", pa.array([heard]), {"spoken": True})
 
 
+if SPEAKING:
+    threading.Thread(target=warm_up, daemon=True).start()
 threading.Thread(target=read_keyboard, daemon=True).start()
-print("Say something to the robot (\"stop\" stops it):", flush=True)
+hint = ", or press Enter, speak, Enter again" if SPEAKING else ""
+print(f"Type a sentence{hint}. \"stop\" stops the robot.", flush=True)
 for event in node:
     if event["type"] == "STOP":
         break
