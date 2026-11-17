@@ -119,11 +119,34 @@ list is fixed and checked against the recorded reply (passes) and against the ol
 unchanged; replies got slightly more precise ("it's standing there now"). 32 pure tests and the
 4 failure scenarios pass.
 
+## Fix: don't knock over what's already there
+
+`spikes/knockover_check.py` replays case 7 without the model (room 6, bottle then box to one
+table) and logs every contact between the robot and a still object. The box was not the problem:
+the **wrist and middle finger** pushed the bottle 25 cm while the robot walked in carrying the box.
+The place check allowed a neighbor 12 cm right of the spot; measured, the carrying hand reaches 24
+cm right.
+
+| Change | Where |
+| --- | --- |
+| `PLACE_SWEEP` is three measured rectangles, one per phase: carrying in (24 cm right), over the spot and down (14 cm right, 12 cm ahead), tucked and stepping back (33 cm right, off the table edge) | `g1/reach.py` |
+| "next to" tries a second ring at 16 cm when the 13 cm ring has no free hand path | `g1/reach.py` |
+| a test with case 7's exact positions | `tests/test_reach.py` |
+
+| Check | Before | After |
+| --- | --- | --- |
+| case 7 replay, table B | bottle pushed 25 cm, on the floor | box at a spot 30 cm away, bottle moved under 1 cm, upright |
+| same, table A | the box knocked a neighbor off | bottle upright, moved under 1 cm |
+| `skills_eval.py`, 5 rooms | | 10 of 10 placed, 0.6 to 1.7 cm, upright; 5 honest refusals |
+| failure scenarios, pure tests | | 4 of 4, 34 tests |
+
 ## Still open
 
-- **Placing a second object can still knock the first one over** (case 7, both runs). The robot
-  now says so; it doesn't prevent it yet. The place-spot finder should keep more distance to
-  objects it just put down, or check the hand's path against them.
+- **Picking can still nudge a neighbor:** room 3 of the eval, the open hand pushed a bottle 5 cm
+  on its way in (`open hand next to it`). `HAND_SWEEP` for picking is still the phase 4 guess;
+  measure it the same way as `PLACE_SWEEP`.
+- A wrist graze during `step back` moves a neighbor under 1 cm.
+
 - A neighbor hidden behind another object can be reported as "can't see it anymore": a false
   alarm, less likely with the longer 2.5 s look after placing.
 
