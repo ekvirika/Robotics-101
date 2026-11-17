@@ -47,7 +47,7 @@ def test_next_to_keeps_the_gap():
     options, _ = reach.place_options(("next_to", anchor), [anchor])
     assert options
     for o in options:
-        assert np.isclose(np.hypot(*(o.spot - anchor)), reach.NEXT_TO)
+        assert any(np.isclose(np.hypot(*(o.spot - anchor)), r) for r in reach.NEXT_TO)
 
 
 def test_place_avoids_other_objects():
@@ -71,3 +71,12 @@ def test_placing_next_to_an_object_on_the_left_is_free():
     assert reach.blocked(spot, heading, [(1.53, 0.0)], reach.PLACE_SWEEP) is not None  # fingers reach it
     # on the right, the carried object arrives 6 cm right of the spot (phase 4, room 0: a box pushed 8 cm)
     assert reach.blocked(spot, heading, [(1.38, -0.13)], reach.PLACE_SWEEP) is not None
+
+
+def test_the_carrying_wrist_needs_room_on_the_right():
+    # phase 5, agent case 7: the box carried in to (0.85, -1.5) from +y, the wrist pushed this bottle 25 cm
+    spot, heading, bottle = (0.85, -1.5), -np.pi / 2, (0.70, -1.45)
+    assert reach.blocked(spot, heading, [bottle], reach.PLACE_SWEEP) is not None
+    options, _ = reach.place_options("table_b", [bottle])
+    assert options
+    assert all(reach.blocked(o.spot, o.heading, [bottle], reach.PLACE_SWEEP) is None for o in options)

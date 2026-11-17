@@ -24,15 +24,18 @@ from g1.mission import APPROACH, GRASP_SPOT
 
 MIN_DEPTH = 0.05  # m: closer to the edge, the fingers close past the table edge
 MAX_DEPTH = 0.17  # m: measured: 18 cm works, 20 cm the legs hit the table; 1 cm margin
-HAND_SWEEP = ((-0.16, 0.12), (-APPROACH - 0.04, 0.04))  # m around the spot, (ahead, left) in the robot's frame:
+HAND_SWEEP = (((-0.16, 0.12), (-APPROACH - 0.04, 0.04)),)  # m around the spot, (ahead, left) in the robot's frame:
 # fingertips 12 cm ahead; 16 cm behind: after lifting, the object goes back into the carry pose
 # (10 cm behind, 6 cm right of the spot); from 4 cm past the entry point (8 cm right) to 4 cm left
-PLACE_SWEEP = ((-0.16, 0.12), (-0.12, 0.05))  # placing: the carried object arrives 10 cm behind and 6 cm
-# right of the spot (the carry pose at the stand pose), goes in, down, and the hand pulls straight back
+PLACE_SWEEP = (  # placing, measured: the right hand's geoms at every step (spikes/knockover_check.py)
+    ((-0.80, -0.04), (-0.24, -0.04)),  # carrying it in from the approach point: wrist and fingers up to 24 cm right
+    ((-0.24, 0.12), (-0.14, 0.08)),  # over the spot, down, open, pull straight back, raise
+    ((-0.50, -0.13), (-0.33, -0.01)),  # fingers turned in, tucked, stepping back
+)
 OBJECT_RADIUS = 0.035  # m: the widest object (a can, or a box's corner seen side-on)
 PLACE_DEPTH = 0.10  # m from the edge, where objects are put down
 PLACE_GAP = 0.13  # m: a put-down object keeps this distance to every other object
-NEXT_TO = 0.13  # m between centers for "next to"
+NEXT_TO = (0.13, 0.16)  # m between centers for "next to": two rings, the outer one when the hand needs room
 MARK = np.array(scenes.PLACE_MARK)
 
 
@@ -87,17 +90,18 @@ def blocked(spot, heading, others, sweep=None):
     """The other object in the hand's way, or None.
 
     Not just the point where the hand comes in: the whole area the hand sweeps
-    while it comes in, closes and pulls away, as a rectangle around the spot in
-    the robot's frame (HAND_SWEEP), grown by an object's radius. Phase 4 found
-    why: the fingers reach 10 cm past the grasp point and pushed a box 6 cm.
+    while it comes in, closes and pulls away, as rectangles around the spot in
+    the robot's frame (HAND_SWEEP, PLACE_SWEEP), grown by an object's radius.
+    Phase 4 found why: the fingers reach 10 cm past the grasp point and pushed
+    a box 6 cm. Phase 5 found the carrying wrist 24 cm right of the spot.
     """
     c, s = np.cos(heading), np.sin(heading)
-    (ahead_min, ahead_max), (left_min, left_max) = HAND_SWEEP if sweep is None else sweep
     for other in others:
         d = np.asarray(other[:2]) - np.asarray(spot[:2])
         ahead, left = c * d[0] + s * d[1], -s * d[0] + c * d[1]
-        if ahead_min - OBJECT_RADIUS < ahead < ahead_max + OBJECT_RADIUS and left_min - OBJECT_RADIUS < left < left_max + OBJECT_RADIUS:
-            return other
+        for (ahead_min, ahead_max), (left_min, left_max) in HAND_SWEEP if sweep is None else sweep:
+            if ahead_min - OBJECT_RADIUS < ahead < ahead_max + OBJECT_RADIUS and left_min - OBJECT_RADIUS < left < left_max + OBJECT_RADIUS:
+                return other
     return None
 
 
@@ -142,8 +146,9 @@ def place_options(target, others=(), anchor=None):
         table = table_of(center)
         if table is None:
             return [], "that object is not on a table"
-        for angle in np.radians(np.arange(0, 360, 30)):
-            candidates.append((center + NEXT_TO * np.array([np.cos(angle), np.sin(angle)]), table))
+        for radius in NEXT_TO:
+            for angle in np.radians(np.arange(0, 360, 30)):
+                candidates.append((center + radius * np.array([np.cos(angle), np.sin(angle)]), table))
         others = [o for o in others if np.hypot(*(np.asarray(o[:2]) - center)) > 0.01]
         others = list(others) + [center]
     elif target in scenes.TABLES:
