@@ -2,7 +2,7 @@
 
 The same parts as the dora graph (Simulator, Locomotion, ArmController,
 Mission), wired together in one loop instead of exchanging messages. It runs
-faster than real time, so you can check a change in about a minute.
+about 20 times faster than real time (about 2 s), so you can check every change.
 
   uv run python tests/test_mission.py           (prints the steps, PASS or FAIL)
   uv run python tests/test_mission.py --vision  (the bottle position from the head camera)

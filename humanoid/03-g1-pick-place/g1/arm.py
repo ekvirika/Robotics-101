@@ -6,8 +6,7 @@ movej and movel):
               curve. Good for big moves through free space.
   line move   the hand goes in a straight line (IK at every step). Good near
               objects, where the path matters.
-Both follow a speed profile: speed up, cruise, slow down, stop on the target
-(the same idea as lesson 1's trajectory.py).
+Both follow a speed profile: speed up, cruise, slow down, stop on the target.
 
 Only the right arm moves; the left arm holds its walking pose.
 """
@@ -155,8 +154,7 @@ class ArmController:
 
         Returns (targets, kp, kd, tau) for the 28 joints. tau is gravity
         compensation: the torque that holds each joint against the weight of
-        what hangs on it (lesson 1's weight torque, now computed by MuJoCo
-        for 7 joints at once).
+        what hangs on it (weight x lever, computed by MuJoCo for every joint).
         """
         dt = 0.0 if self.last_time is None else time - self.last_time
         self.last_time = time

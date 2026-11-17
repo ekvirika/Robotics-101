@@ -24,6 +24,7 @@ folder_of() {
     arm) echo extras/simulations/arm ;;
     arm-nodes) echo humanoid/02-dora-nodes ;;
     g1-pick-place) echo humanoid/03-g1-pick-place ;;
+    g1-crowd) echo humanoid/04-g1-crowd ;;
     g1-skills) echo humanoid/03-g1-pick-place ;;
     g1-agent) echo humanoid/03-g1-pick-place ;;
     *) echo "" ;;
@@ -46,6 +47,7 @@ usage() {
   echo "  humanoid track:"
   echo "    arm-nodes      lesson 2: the MuJoCo arm as 7 dora nodes (3D window + Rerun charts)"
   echo "    g1-pick-place  lesson 3: the Unitree G1 walks, picks up a bottle, puts it on another table"
+  echo "    g1-crowd       lesson 4: the Unitree G1 crosses a square full of walking people"
   echo "    g1-agent       tell the robot in words: Claude plans with the skills (needs ANTHROPIC_API_KEY);"
   echo "                   then talk in a second terminal: cd humanoid/03-g1-pick-place && uv run --no-sync python nodes/chat.py"
   echo "    g1-skills      tell the robot: skills from a script, ROBOT_SCRIPT=\"look_around; pick red can; place mark\" SEED=3"
@@ -65,7 +67,7 @@ dir="$(folder_of "$name")"
 
 case "$name" in
   yolo|fake-camera|robust) uv sync --quiet --extra vision ;;
-  arm-nodes) uv sync --quiet --extra sim ;;
+  arm-nodes|g1-crowd) uv sync --quiet --extra sim ;;
   g1-pick-place|g1-skills|g1-agent) uv sync --quiet --extra sim --extra detect --extra agent ;;
   *) uv sync --quiet ;;
 esac
