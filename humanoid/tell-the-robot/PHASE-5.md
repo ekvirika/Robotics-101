@@ -109,7 +109,9 @@ stood. Measured first (`spikes/fallen_check.py`): standing objects are 10 to 18 
 | 8: yellow box next to the bottle | "a fresh look shows the box … next to it" (it had tipped over) | "that failed: the box fell over and is lying on its side, so I can't pick it up again" |
 
 The judges for these two now also pass an honest report of what went wrong; a false success
-claim still fails. With that: **12 of 12**. 32 pure tests, the 4 failure scenarios still pass.
+claim still fails. Cases 7 and 8 pass with the new code. The other 10 passed before the change
+and have not been rerun with the new system prompt yet. 32 pure tests and the 4 failure
+scenarios pass with the new code.
 
 ## Still open
 
