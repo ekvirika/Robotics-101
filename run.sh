@@ -25,6 +25,7 @@ folder_of() {
     arm-nodes) echo humanoid/02-dora-nodes ;;
     g1-pick-place) echo humanoid/03-g1-pick-place ;;
     g1-skills) echo humanoid/03-g1-pick-place ;;
+    g1-agent) echo humanoid/03-g1-pick-place ;;
     *) echo "" ;;
   esac
 }
@@ -45,6 +46,8 @@ usage() {
   echo "  humanoid track:"
   echo "    arm-nodes      lesson 2: the MuJoCo arm as 7 dora nodes (3D window + Rerun charts)"
   echo "    g1-pick-place  lesson 3: the Unitree G1 walks, picks up a bottle, puts it on another table"
+  echo "    g1-agent       tell the robot in words: Claude plans with the skills (needs ANTHROPIC_API_KEY);"
+  echo "                   then talk in a second terminal: cd humanoid/03-g1-pick-place && uv run --no-sync python nodes/chat.py"
   echo "    g1-skills      tell the robot: skills from a script, ROBOT_SCRIPT=\"look_around; pick red can; place mark\" SEED=3"
 }
 
@@ -63,7 +66,7 @@ dir="$(folder_of "$name")"
 case "$name" in
   yolo|fake-camera|robust) uv sync --quiet --extra vision ;;
   arm-nodes) uv sync --quiet --extra sim ;;
-  g1-pick-place|g1-skills) uv sync --quiet --extra sim --extra detect ;;
+  g1-pick-place|g1-skills|g1-agent) uv sync --quiet --extra sim --extra detect --extra agent ;;
   *) uv sync --quiet ;;
 esac
 
@@ -74,7 +77,7 @@ for arg in "$@"; do
 done
 
 cd "$dir"
-if [[ "$name" == "g1-pick-place" || "$name" == "g1-skills" ]]; then
+if [[ "$name" == "g1-pick-place" || "$name" == "g1-skills" || "$name" == "g1-agent" ]]; then
   # the room: robot/scene.xml, or with SEED=<n> a random room with more objects (tell-the-robot phase 3)
   uv run --no-sync python -m g1.scenes "${SEED:-}"
 fi
@@ -90,6 +93,7 @@ case "$dir" in
 esac
 flow=dataflow.yml
 [[ "$name" == "g1-skills" ]] && flow=skills.yml
+[[ "$name" == "g1-agent" ]] && flow=agent.yml
 export VIEWER="${VIEWER:-rerun}"
 if [[ $raw -eq 1 ]]; then
   exec dora run "$flow" ${args[@]+"${args[@]}"}

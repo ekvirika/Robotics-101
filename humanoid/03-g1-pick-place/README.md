@@ -16,6 +16,8 @@ The full G1 humanoid (29 body joints + two Dex3 hands = 43 motors) walks to tabl
 - To push the robot or the bottle: double-click a part, then Ctrl + right-drag.
 - Backspace in the window resets only the physics, not the mission. To start over, stop and run again.
 
+Tell it in words (tell-the-robot phase 5): `../tell-the-robot/demo.sh g1-agent`, then in a second terminal `uv run --no-sync python nodes/chat.py`. Claude chooses the skills; needs `ANTHROPIC_API_KEY` (or a proxy, see `../tell-the-robot/PHASE-5.md`).
+
 Skills instead of the fixed mission (tell-the-robot phase 4): `./run.sh g1-skills`, or with your own script `SEED=3 ROBOT_SCRIPT="look_around; pick red can; place table_a" ./run.sh g1-skills`. See `skills.yml` and `../tell-the-robot/PHASE-4.md`.
 
 A random room with more objects on the tables (tell-the-robot phase 3): `SEED=7 ./run.sh g1-pick-place`. The robot still fetches the blue bottle; the Rerun **memory** panel lists everything it has seen.
@@ -41,7 +43,7 @@ Nine dora nodes. Each does one job, the same split as on a real robot:
 | `locomotion` | walks (Unitree's trained policy) or stands still and balances | Unitree's locomotion controller |
 | `arm` | moves the right hand (inverse kinematics, smooth paths), opens and closes it | an arm controller (like MoveIt + ros2_control) |
 | `task` | the 17 steps | a mission planner / behavior tree |
-| `camera` | renders the head camera, color and depth, 15 Hz | the RealSense D435i in the G1's head |
+| `camera` | renders the head camera, color and depth, 10 Hz | the RealSense D435i in the G1's head |
 | `perception` | finds the bottle in the images, its 3D position in the room | the same code |
 | `detector` | OWLv2 finds every object on the tables while the robot stands still; kind from height, color from hue | the same code |
 | `world` | the memory: every object seen, with an id that doesn't change, forgotten only when the camera should see it and doesn't | the same code |
@@ -53,9 +55,9 @@ The messages between them:
 | --- | --- | --- | --- |
 | sim → locomotion, arm | `low_state` | 500 Hz | 43 joint angles and speeds, IMU (tilt, turn rates) |
 | sim → task | `base_pose` | 50 Hz | where the robot is |
-| sim → camera | `world_state` | 15 Hz | every position in the scene, to draw it |
-| camera → perception | `rgb`, `depth`, `cam_pose` | 15 Hz | the images and where the camera was |
-| perception → task | `bottle_pose` | 15 Hz | where the camera sees the bottle |
+| sim → camera | `world_state` | 10 Hz | every position in the scene, to draw it |
+| camera → perception | `rgb`, `depth`, `cam_pose` | 10 Hz | the images and where the camera was |
+| perception → task | `bottle_pose` | 10 Hz | where the camera sees the bottle |
 | locomotion → sim | `joint_command` | 50 Hz | legs + waist: target angle, kp, kd, extra torque |
 | arm → sim | `joint_command` | 50 Hz | arms + hands: the same four values per joint |
 | task → locomotion | `cmd_vel` | 50 Hz | walk: forward, left, turn |

@@ -1,7 +1,7 @@
 """The robot's memory of the objects on the tables (g1/world.py).
 
 Inputs:  seen          what the detector found in one image (detector)
-         depth         head camera depth images, 15 Hz (camera): kept for a few
+         depth         head camera depth images, 10 Hz (camera): kept for a few
          cam_pose      seconds, to check what the camera should have seen in the
                        image the detector used
          arm_area      [x, y] where the arm works, [nan, nan] when done (skills)
@@ -9,7 +9,7 @@ Inputs:  seen          what the detector found in one image (detector)
 Outputs: objects       JSON text: [{id, kind, color, position, last_seen, sightings}],
                        after every update
 
-The depth images arrive 15 times a second, the detector's results about 0.4 s
+The depth images arrive 10 times a second, the detector's results about 0.4 s
 later. KEEP is how many seconds of depth images to hold.
 """
 

@@ -5,20 +5,21 @@ robot does exactly the same thing.
 
 Inputs:  base_pose     where the robot is and how far it leans, 50 Hz (sim)
          bottle_pose   where the bottle really is, 50 Hz (sim)
-         seen_bottle   where the camera says it is, 15 Hz (perception)
+         seen_bottle   where the camera says it is, 10 Hz (perception)
          objects       the memory: every object seen, with its id (world)
          cmd_vel       the walking command (task)
          standing      1 = legs stand still and steady (locomotion)
          arm_command   the hand target, in the body frame (task)
          arm_status    which arm command finished (arm)
-         step          the mission step as text (task)
-         rgb, depth    the head camera images, 15 Hz (camera)
-         cam_pose      where the head camera is, 15 Hz (camera)
+         step          the mission step as text (task), or the skill step (skills)
+         conversation  what was heard, each tool call and result, each reply (agent, phase 5)
+         rgb, depth    the head camera images, 10 Hz (camera)
+         cam_pose      where the head camera is, 10 Hz (camera)
          tick          draw timer
 
 The head camera is drawn twice: as a 2D image, and in the 3D room as a
-pyramid (its field of view) with the image on it. Images are logged 5 times
-a second and compressed, so a saved run stays small.
+pyramid (its field of view) with the image on it. Images are logged 2 times
+a second (IMAGE_EVERY) and compressed: less work for the viewer, a small saved run.
 
 The tables and the green mark come from robot/scene.xml, so the map always
 matches the simulation.
@@ -39,7 +40,7 @@ from g1 import frames, messages
 from g1.simulator import yaw_of
 
 TRAIL_POINTS = 2000  # how much of the walked path to keep (50 Hz: 40 s)
-IMAGE_EVERY = 0.19  # s of robot time between logged images: every 3rd frame of 15 Hz (5 Hz)
+IMAGE_EVERY = float(os.environ.get("IMAGE_EVERY", "0.49"))  # s of robot time between logged images: every 5th frame of 10 Hz (2 Hz)
 HAND_KINDS = {
     messages.REST: "arm down",
     messages.MOVE_JOINTS: "joint move",
@@ -78,6 +79,7 @@ def start_rerun():
                 ),
                 rrb.Vertical(
                     rrb.TextLogView(name="mission", origin="log"),
+                    rrb.TextLogView(name="conversation", origin="talk"),
                     rrb.TextDocumentView(name="memory", origin="memory"),
                     rrb.TimeSeriesView(name="walk command", origin="cmd_vel"),
                     rrb.TimeSeriesView(name="balance", origin="balance"),
@@ -202,6 +204,10 @@ for event in node:
     elif name == "standing":
         rr.set_time("sim_time", duration=time)
         rr.log("standing/steady", rr.Scalars(event["value"].to_numpy()[0]))
+
+    elif name == "conversation":
+        rr.set_time("sim_time", duration=time)
+        rr.log("talk", rr.TextLog(event["value"][0].as_py(), level="INFO"))
 
     elif name == "step":
         rr.set_time("sim_time", duration=time)

@@ -1,11 +1,11 @@
-"""The head camera: color and depth images of what the robot sees, 15 times a second.
+"""The head camera: color and depth images of what the robot sees, 10 times a second (CAMERA_HZ in sim).
 
 It keeps its own copy of the MuJoCo world. For every world_state from sim it
 moves everything into place and draws the scene from the head camera
 (g1/camera.py). Drawing takes 10-20 ms, so it runs here and not in sim,
 whose physics step has 2 ms.
 
-Inputs:  world_state  every position in the scene, 15 Hz (sim)
+Inputs:  world_state  every position in the scene, 10 Hz (sim)
 Outputs: rgb          uint8, height x width x 3, flattened
          depth        float32 meters along the viewing axis, height x width, flattened
          cam_pose     [time, x, y, z, r11 .. r33]: where the camera is, image convention

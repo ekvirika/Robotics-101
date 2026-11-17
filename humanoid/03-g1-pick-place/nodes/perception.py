@@ -3,7 +3,7 @@
 This replaces sim/bottle_pose for the task. The simulator still knows the true
 position, but only the dashboard looks at it, to show how far off the camera is.
 
-Inputs:  rgb, depth   head camera images, 15 Hz (camera)
+Inputs:  rgb, depth   head camera images, 10 Hz (camera)
          cam_pose     where the camera was for those images (camera)
 Outputs: bottle_pose  [time, x, y, z, 1, 0, 0, 0]: the bottle center in the room,
                       time = when the image was taken. Only sent when the bottle is seen.
