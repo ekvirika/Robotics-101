@@ -88,10 +88,37 @@ and tools stay valid.
   time, and the Mac stayed cool. The Rerun window itself is the biggest part, 1.2 cores while
   drawing, then the physics, 1.1.
 
+## Fix: standing or fallen over
+
+Both evaluation failures came from one gap: the memory knew where an object was, not whether it
+stood. Measured first (`spikes/fallen_check.py`): standing objects are 10 to 18 cm high, lying ones
+6.2 to 6.8 cm, so a top below 8 cm means lying. Height says nothing about a lying object's kind
+(all about 6 cm; before the fix every fallen bottle became a "box").
+
+| Layer | Change |
+| --- | --- |
+| `g1/objects.py` | every sighting is standing, lying, or unknown (top cut off); lying sightings have no kind |
+| `g1/world.py` | the memory stores `standing`; a lying sighting matches the same color up to 15 cm away, so a fallen bottle keeps its id and stays a bottle |
+| `g1/agent.py` | `get_objects` shows "LYING ON ITS SIDE (fell over)"; `check_call` refuses to pick it |
+| `g1/skills.py` | `pick` refuses lying objects; `place` succeeds only if the object is seen standing at the spot; neighbors that fell over, moved, or are not seen again are reported |
+| system prompt | a FAILED result stays failed, even if the object is found nearby later |
+
+| Case | Before | After |
+| --- | --- | --- |
+| 7: blue bottle and yellow box on table B | "I moved both onto table B" (the bottle was on the floor) | "after the box went down, the blue bottle was gone, and when I looked around again I couldn't find it anywhere" (it looked around again on its own) |
+| 8: yellow box next to the bottle | "a fresh look shows the box … next to it" (it had tipped over) | "that failed: the box fell over and is lying on its side, so I can't pick it up again" |
+
+The judges for these two now also pass an honest report of what went wrong; a false success
+claim still fails. With that: **12 of 12**. 32 pure tests, the 4 failure scenarios still pass.
+
 ## Still open
 
-- **Standing or fallen over.** The memory needs each object's height (a fallen bottle is 6 cm
-  high), `get_objects` should show it, and `place` should check it, also for neighbors.
+- **Placing a second object can still knock the first one over** (case 7, both runs). The robot
+  now says so; it doesn't prevent it yet. The place-spot finder should keep more distance to
+  objects it just put down, or check the hand's path against them.
+- A neighbor hidden behind another object can be reported as "can't see it anymore": a false
+  alarm, less likely with the longer 2.5 s look after placing.
+
 - **Live demo, room 2:** `look_around` missed the yellow can that the headless evaluation found.
   Claude answered honestly ("couldn't find a yellow can"). Detection while live needs more looks
   per view, or a third viewpoint.
@@ -110,4 +137,4 @@ and tools stay valid.
 ## Next: phase 6, voice
 
 Push-to-talk, Whisper on the Mac for speech to text, `say` for the replies, and the dashboard laid
-out for an audience. First, the "standing or fallen over" gap from above.
+out for an audience.
