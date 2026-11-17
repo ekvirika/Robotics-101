@@ -16,12 +16,15 @@ Type or say "stop" to stop the robot at once. Ctrl-D or Ctrl-C to leave (the rob
 import os
 import sys
 import threading
+from pathlib import Path
 
 import numpy as np
 import pyarrow as pa
 from dora import Node
 
-from g1 import voice
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))  # started by hand, not by dora: find g1/
+
+from g1 import voice  # noqa: E402
 
 SPEAKING = os.environ.get("CHAT_VOICE", "1") != "0"
 MODEL = os.environ.get("WHISPER_MODEL", voice.MODEL)
