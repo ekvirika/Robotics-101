@@ -1,5 +1,0 @@
-$ dora validate dataflow.yml
-Validating dataflow.yml...
-Input/output wiring OK.
-Descriptor config OK.
-All type annotations OK.

@@ -1,27 +1,179 @@
+# Copyright (c) 2022-2026, The Isaac Lab Project Developers (https://github.com/isaac-sim/IsaacLab/blob/main/CONTRIBUTORS.md).
+# All rights reserved.
+#
+# SPDX-License-Identifier: BSD-3-Clause
+
+
 [project]
-name = "dora-robotics"
-version = "0.1.0"
-description = "dora-rs examples and small robot simulations, runnable on a laptop"
-requires-python = ">=3.11,<3.14"
+name = "g1-robotics"
+version = "0.3.0"
+description = "Unitree G1 tasks in NVIDIA Isaac Lab, with dora: reusable robot software and one folder per task"
+requires-python = ">=3.10"
 dependencies = [
+    "numpy",
+    "pin",           # Pinocchio: arm kinematics on Unitree's G1 model (g1/kinematics.py)
+    "gymnasium",     # the environment registry Isaac Lab uses (tasks/*/__init__.py)
     "dora-rs==1.1.0",
-    "pyarrow>=17",
-    "numpy>=2.0",
-    "rerun-sdk>=0.24",
+    "pyarrow",
 ]
 
 [project.optional-dependencies]
-vision = [
-    "opencv-python>=4.10",
-    "ultralytics>=8.3",
-]
-sim = [
-    "mujoco>=3.3",
-    "onnxruntime>=1.20",
-]
+dev = ["pytest", "ruff", "pre-commit"]
 
-[tool.uv]
-package = false
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+# Three packages: the robot (source/g1), the places it works in (source/area)
+# and the tasks (tasks/), installed together with `pip install -e .`
+[tool.setuptools]
+packages = ["g1", "g1.nodes", "area", "tasks", "tasks.crossing", "tasks.pick_and_place", "tasks.pick_and_place.nodes"]
+
+[tool.setuptools.package-dir]
+g1 = "source/g1"
+area = "source/area"
+tasks = "tasks"
+
+[tool.setuptools.package-data]
+g1 = ["assets/*"]
+
+# Code-style and test settings from the Isaac Lab project template (v3.0.0-beta2)
 
 [tool.ruff]
-line-length = 88
+line-length = 120
+target-version = "py310"
+
+# Exclude directories
+extend-exclude = [
+    "logs",
+    "_isaac_sim",
+    ".vscode",
+    "_*",
+    ".git",
+]
+
+[tool.ruff.lint]
+# Enable flake8 rules and other useful ones
+select = [
+    "E",      # pycodestyle errors
+    "W",      # pycodestyle warnings
+    "F",      # pyflakes
+    "I",      # isort
+    "UP",     # pyupgrade
+    "C90",    # mccabe complexity
+    # "D",      # pydocstyle
+    "SIM",    # flake8-simplify
+    "RET",    # flake8-return
+]
+
+# Ignore specific rules (matching your flake8 config)
+ignore = [
+    "E402",   # Module level import not at top of file
+    "D401",   # First line should be in imperative mood
+    "RET504", # Unnecessary variable assignment before return statement
+    "RET505", # Unnecessary elif after return statement
+    "SIM102", # Use a single if-statement instead of nested if-statements
+    "SIM103", # Return the negated condition directly
+    "SIM108", # Use ternary operator instead of if-else statement
+    "SIM117", # Merge with statements for context managers
+    "SIM118", # Use {key} in {dict} instead of {key} in {dict}.keys()
+    "UP006",  # Use 'dict' instead of 'Dict' type annotation
+    "UP018",  # Unnecessary `float` call (rewrite as a literal)
+]
+
+[tool.ruff.lint.per-file-ignores]
+"__init__.py" = ["F401"]  # Allow unused imports in __init__.py files
+
+[tool.ruff.lint.mccabe]
+max-complexity = 30
+
+[tool.ruff.lint.pydocstyle]
+convention = "google"
+
+[tool.ruff.lint.isort]
+
+# Custom import sections with separate sections for each Isaac Lab extension
+section-order = [
+    "future",
+    "standard-library",
+    "third-party",
+    # Group omniverse extensions separately since they are run-time dependencies
+    # which are pulled in by Isaac Lab extensions
+    "omniverse-extensions",
+    # Group Isaac Lab extensions together since they are all part of the Isaac Lab project
+    "isaaclab",
+    "isaaclab-contrib",
+    "isaaclab-rl",
+    "isaaclab-mimic",
+    "isaaclab-tasks",
+    "isaaclab-assets",
+    # First-party is reserved for project templates
+    "first-party",
+    "local-folder",
+]
+
+[tool.ruff.lint.isort.sections]
+# Define what belongs in each custom section
+
+"omniverse-extensions" = [
+    "isaacsim",
+    "omni",
+    "pxr",
+    "carb",
+    "usdrt",
+    "Semantics",
+    "curobo",
+]
+
+"isaaclab" = ["isaaclab"]
+"isaaclab-assets" = ["isaaclab_assets"]
+"isaaclab-contrib" = ["isaaclab_contrib"]
+"isaaclab-rl" = ["isaaclab_rl"]
+"isaaclab-mimic" = ["isaaclab_mimic"]
+"isaaclab-tasks" = ["isaaclab_tasks"]
+
+[tool.ruff.format]
+
+docstring-code-format = true
+
+[tool.pyright]
+
+include = ["source", "scripts"]
+exclude = [
+    "**/__pycache__",
+    "**/_isaac_sim",
+    "**/docs",
+    "**/logs",
+    ".git",
+    ".vscode",
+]
+
+typeCheckingMode = "basic"
+pythonVersion = "3.12"
+pythonPlatform = "Linux"
+enableTypeIgnoreComments = true
+
+# This is required as the CI pre-commit does not download the module (i.e. numpy, torch, prettytable)
+# Therefore, we have to ignore missing imports
+reportMissingImports = "none"
+# This is required to ignore for type checks of modules with stubs missing.
+reportMissingModuleSource = "none" # -> most common: prettytable in mdp managers
+
+reportGeneralTypeIssues = "none"       # -> raises 218 errors (usage of literal MISSING in dataclasses)
+reportOptionalMemberAccess = "warning" # -> raises 8 errors
+reportPrivateUsage = "warning"
+
+
+[tool.codespell]
+skip = '*.usd,*.usda,*.usdz,*.svg,*.png,_isaac_sim*,*.bib,*.css,*/_build'
+quiet-level = 0
+# the world list should always have words in lower case
+ignore-words-list = "haa,slq,collapsable,buss,reacher,thirdparty,segway"
+
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+markers = [
+    "isaacsim_ci: mark test to run in isaacsim ci",
+]

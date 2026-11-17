@@ -1,0 +1,52 @@
+# Crowd crossing: get across a square full of walking people as fast as is safe.
+#
+#   sim ──scan──▶ tracker ──tracks──▶ planner ──cmd_vel_nav──▶ safety ──cmd_vel──▶ sim
+#    └──base_pose──▶ tracker, planner, safety          (cmd_vel also back to planner)
+#
+# sim:     the G1 and the square in Isaac Lab (shared node g1/nodes/sim.py)
+# tracker, planner, safety: the robot's walking software as separate nodes
+#          (shared nodes g1/nodes/); safety can only slow down or stop
+#          (like ROS 2 Nav2's Collision Monitor)
+#
+# Run on the Isaac Sim machine, from this folder:  dora run dataflow.yml
+# Watch at <your link>/viewer/ . Nodes start with Isaac Lab's Python
+# (isaaclab.sh -p); change the path if Isaac Lab is installed elsewhere.
+
+nodes:
+  - id: sim
+    path: /workspace/isaaclab/isaaclab.sh
+    args: -p -m g1.nodes.sim --livestream 2 --viz kit # or --headless: no picture
+    inputs:
+      cmd_vel: safety/cmd_vel
+    outputs: [base_pose, robot_state, scan, object_pose]
+    env:
+      TASK: G1-Crowd-Crossing-v0
+      SEED: 0 # which crowd
+
+  - id: tracker
+    path: /workspace/isaaclab/isaaclab.sh
+    args: -p -m g1.nodes.tracker
+    inputs:
+      scan: sim/scan
+      base_pose: sim/base_pose
+    outputs: [tracks]
+
+  - id: planner
+    path: /workspace/isaaclab/isaaclab.sh
+    args: -p -m g1.nodes.planner
+    inputs:
+      tracks: tracker/tracks
+      base_pose: sim/base_pose
+      cmd_vel: safety/cmd_vel # what was really sent: the smoothing continues from it
+    outputs: [cmd_vel_nav]
+    env:
+      GOAL: "5,0" # tasks/crossing/layout.py GOAL
+
+  - id: safety
+    path: /workspace/isaaclab/isaaclab.sh
+    args: -p -m g1.nodes.safety
+    inputs:
+      cmd_vel_nav: planner/cmd_vel_nav
+      tracks: tracker/tracks
+      base_pose: sim/base_pose
+    outputs: [cmd_vel]

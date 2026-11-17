@@ -1,0 +1,35 @@
+# Pick and place: walk to table A, pick up the bottle, walk to table B, put it on the mark.
+#
+#   sim ──base_pose, robot_state, scan, object_pose──▶ mission
+#    ▲                                                   │
+#    └──────────── cmd_vel, upper_body, hands ───────────┘
+#
+# sim:     the G1 and the room in Isaac Lab (shared node g1/nodes/sim.py)
+# mission: this task's logic (tasks/pick_and_place/mission.py) on the robot's interfaces
+#
+# Run on the Isaac Sim machine, from this folder:  dora run dataflow.yml
+# Watch at <your link>/viewer/ . Nodes start with Isaac Lab's Python
+# (isaaclab.sh -p); change the path if Isaac Lab is installed elsewhere.
+
+nodes:
+  - id: sim
+    path: /workspace/isaaclab/isaaclab.sh
+    args: -p -m g1.nodes.sim --livestream 2 --viz kit # or --headless: no picture
+    inputs:
+      cmd_vel: mission/cmd_vel
+      upper_body: mission/upper_body
+      hands: mission/hands
+    outputs: [base_pose, robot_state, scan, object_pose]
+    env:
+      TASK: G1-Pick-Place-v0
+      OBJECTS: bottle
+
+  - id: mission
+    path: /workspace/isaaclab/isaaclab.sh
+    args: -p nodes/mission.py
+    inputs:
+      base_pose: sim/base_pose
+      robot_state: sim/robot_state
+      scan: sim/scan
+      object_pose: sim/object_pose
+    outputs: [cmd_vel, upper_body, hands]
