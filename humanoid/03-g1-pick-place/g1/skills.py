@@ -1,6 +1,7 @@
 """Skills: what the robot can do, as reusable building blocks with honest results.
 
-    look_around()          survey both tables, the memory fills up
+    look_around(find)      survey both tables, the memory fills up; with find ("blue bottle"),
+                           stop as soon as a matching object is in the memory
     go_to(place)           "table_a", "table_b", "mark", "start"
     pick(object_id)        walk to the best side, grasp, lift, check the hand isn't empty
     place(target)          "table_a", "table_b", "mark", or ("next_to", object_id)
@@ -51,6 +52,7 @@ ATTEMPTS = 3  # places and grasps try up to this many options (spots, table side
 NEIGHBORHOOD = 0.3  # m: objects this close to a put-down spot are checked for being pushed
 DISTURBED = 0.03  # m: a neighbor that moved more than this was pushed
 STOP_WAIT = 0.5  # s
+SPOT_LOOK = 1.0  # s: on arrival at a put-down spot, about 3 detector images
 WALK_TIMEOUT = 90.0  # s
 ARM_TIMEOUT = 20.0  # s
 PLACES = {
@@ -81,6 +83,7 @@ class Robot:
     held: int | None = None  # id of the object in the hand
     released_at: np.ndarray | None = None  # set by place: where the held object now stands
     arm_area: np.ndarray | None = None  # (x, y) where the arm works at a table: the memory can't check there
+    unseen: set = field(default_factory=set)  # tables the last look_around skipped (it found what it looked for)
 
     @property
     def pose(self):
@@ -128,6 +131,16 @@ def walk_route(start, goal):
         poses[-1] = np.array([*poses[-1], 1.0])  # the approach point: arrive there, facing the table, don't cut it
         poses.append(goal)
     return poses
+
+
+def carried_at(r, skill):
+    """World position of the object in the hand, or None: the hand's last commanded target.
+
+    The memory moves the held object there, so the camera seeing it in the hand at another
+    table matches it instead of remembering a second object (tell-the-robot phase 6)."""
+    if r.held is None:
+        return None
+    return frames.to_world(getattr(skill, "hand", CARRY), r.position, r.heading)
 
 
 def in_reach(r, spot, what):
@@ -366,21 +379,48 @@ class Skill:
         return Result(True, "done")
 
 
+def matches(o, text):
+    """Every word of `text` ("blue bottle", "#3", "can") names this memory object."""
+    return all(w in (o["color"], o["kind"], f"#{o['id']}", str(o["id"])) for w in text.lower().split())
+
+
 class LookAround(Skill):
     name = "look_around"
 
+    def __init__(self, find=""):
+        super().__init__()
+        self.find = find.strip()
+        self.found, self.skipped = None, False
+
     def plan(self, r):
-        steps = []
+        steps, looks = [], iter(survey.LOOKS_AT)
+        r.unseen = set(survey.LOOKS_AT)
         for kind, value in survey.look_around_plan():
             if kind == "walk":
                 steps.append(("walk", lambda r, v=value: np.array(v), "walk to a viewpoint"))
             else:
                 steps.append(("look", value, "look"))
+                steps.append(("do", lambda r, t=next(looks): self._looked_at(r, t), "remember the table"))
         return steps
+
+    def _looked_at(self, r, table):
+        """One more table seen. With find: stop once it is in the memory, the viewpoints left are skipped."""
+        r.unseen.discard(table)
+        if not self.find:
+            return
+        self.found = next((o for o in r.objects if matches(o, self.find)), None)
+        if self.found is not None:
+            self.skipped = self.index + 1 < len(self.steps)
+            del self.steps[self.index + 1 :]
 
     def success(self, r):
         labels = ", ".join(f"#{o['id']} {o['color']} {o['kind'] or 'object'}" for o in r.objects)
-        return Result(True, f"I see {len(r.objects)} objects: {labels}" if r.objects else "I see no objects")
+        seen = f"I see {len(r.objects)} objects: {labels}" if r.objects else "I see no objects"
+        if self.skipped:
+            return Result(True, f"{seen} (found {self.find}, stopped looking; not checked: {', '.join(sorted(r.unseen))})")
+        if self.find and self.found is None:
+            return Result(True, f"{seen}; no {self.find} among them")
+        return Result(True, seen)
 
 
 class GoTo(Skill):
@@ -521,6 +561,7 @@ class Place(Skill):
             target = ("next_to", np.array(anchor["position"]))
             where = f"next to #{anchor['id']} {anchor['color']} {anchor['kind'] or 'object'}"
         self.where = where
+        self.known = {o["id"]: np.array(o["position"][:2]) for o in r.objects if o["id"] != r.held}
         options, reason = reach.place_options(target, r.others(but=r.held), anchor=r.position)
         if not options:
             return Result(False, f"can't place {self.what}: {reason}")
@@ -540,6 +581,7 @@ class Place(Skill):
         center_z = scenes.TABLE_TOP + self.half + PLACE_GAP
         return [
             ("walk", lambda r: stand, "precise", f"carry it to {self.where}"),
+        ] + self._first_look(r, option) + [
             ("check", self._in_hand, "check it is still in the hand"),
             ("check", lambda r: in_reach(r, spot, "the spot"), "check the spot is in reach from here"),
             ("do", lambda r: setattr(r, "arm_area", spot), "arm at work"),
@@ -571,7 +613,7 @@ class Place(Skill):
     def try_other(self, r, reason):
         if r.held is None or not hasattr(self, "options"):
             return None  # let go already, or fell out: nothing to retry
-        if "line up" not in reason and "reach" not in reason:
+        if "line up" not in reason and "reach" not in reason and "not free" not in reason:
             return None
         self.attempt += 1
         if self.attempt >= len(self.options):
@@ -584,6 +626,35 @@ class Place(Skill):
             tries = f" (tried {self.attempt + 1} spots)" if getattr(self, "attempt", 0) else ""
             return f"{reason}{tries}; I'm still holding {self.what}"
         return reason
+
+    def _first_look(self, r, option):
+        """The last look_around skipped this table: look at the spot before putting anything down."""
+        if option.table not in r.unseen:
+            return []
+        return [
+            ("look", SPOT_LOOK, "look at the spot"),
+            ("do", lambda r: r.unseen.discard(option.table), "remember the table"),
+            ("check", lambda r: self._spot_free(r, option.spot), "check the spot is free"),
+        ]
+
+    def _spot_free(self, r, spot):
+        """The spot was chosen from memory, maybe before this table was seen: look again on arrival.
+
+        Only what the memory didn't know then counts: a new object, or one that moved more than
+        DISTURBED. A known one shifting 1 cm in the fresh look is not a reason to give up a spot.
+        Free means what place_options means: nothing at the spot, nothing where the hand sweeps."""
+        for o in r.objects:
+            if o["id"] == r.held:
+                continue
+            before = self.known.get(o["id"])
+            if before is not None and np.hypot(*(np.array(o["position"][:2]) - before)) <= DISTURBED:
+                continue
+            what = f"#{o['id']} {o['color']} {o['kind'] or 'object'}"
+            if not reach.free_spot(spot, [o["position"]]):
+                return f"the spot is not free: {what} stands there"
+            if reach.blocked(spot, self.option.heading, [o["position"]], reach.PLACE_SWEEP) is not None:
+                return f"the spot is not free: {what} is in my hand's way"
+        return None
 
     def _in_hand(self, r):
         if r.grip_empty():

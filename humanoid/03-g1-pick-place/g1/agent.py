@@ -46,14 +46,14 @@ The room:
 - objects stand on the tables: bottles, cans and boxes in red, yellow, green and blue
 
 What the robot can do:
-- look_around: walks to two viewpoints and looks at both tables; the memory fills up
+- look_around(find): walks to viewpoints and looks at both tables; the memory fills up. With find ("blue bottle") it stops as soon as it sees that object; place looks at its own spot on arrival, so that is enough for pick and place
 - get_objects: what the memory holds now: id, color, kind, position, standing or lying on its side, whether it can be picked and why not, what is in the hand
 - pick(object_id): walks to the best table side, grasps, lifts; one hand, one object at a time
 - place(target): puts the held object on table_a, table_b, the mark, or next to another object (target next_to + next_to_id)
 - go_to(place): start, table_a, table_b, mark
 
 Rules:
-- Refer to objects only by the ids get_objects returns. Call get_objects before choosing an id; call look_around first if the memory is empty or may be out of date.
+- Refer to objects only by the ids get_objects returns. Call get_objects before choosing an id; call look_around first if the memory is empty or may be out of date. When the request names one object, pass it as find; leave find empty to see everything ("what do you see?", "is there a red can?").
 - If a request matches more than one object (two red cans) or none, ask which one in one short question and stop; don't guess.
 - One robot action at a time: wait for its result before the next.
 - Every result says what happened. If a skill fails, read the reason: try another way when there is one (another object, another place, look_around again), otherwise say what failed and stop. Never say something worked unless its result says so.
@@ -65,8 +65,13 @@ Rules:
 TOOLS = [
     {
         "name": "look_around",
-        "description": "Walk to two viewpoints, look at both tables, update the memory. Takes about 40 s.",
-        "input_schema": {"type": "object", "properties": {}, "required": [], "additionalProperties": False},
+        "description": "Walk to viewpoints, look at both tables, update the memory. Takes about 30 s; with find, it stops as soon as a matching object is seen (about 10 s if it is on table A).",
+        "input_schema": {
+            "type": "object",
+            "properties": {"find": {"type": "string", "description": 'Color and/or kind of the one object the request is about, e.g. "blue bottle"; "" to look at everything.'}},
+            "required": ["find"],
+            "additionalProperties": False,
+        },
         "strict": True,
     },
     {
@@ -178,7 +183,7 @@ def check_call(call, objects, held):
 def skill_command(call):
     """A checked tool call -> the JSON command nodes/skills.py takes."""
     if call.name == "look_around":
-        return {"skill": "look_around"}
+        return {"skill": "look_around", "find": call.input.get("find", "")}
     if call.name == "go_to":
         return {"skill": "go_to", "place": call.input["place"]}
     if call.name == "pick":

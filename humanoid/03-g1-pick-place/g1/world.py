@@ -40,7 +40,7 @@ IMAGE_MARGIN = 20  # pixels: near the image edge, an object may be half outside
 HIDDEN = 0.05  # m: something this much nearer in the depth image covers the object
 ARM_AREA = 0.3  # m: around where the arm works, the robot's own hand hides objects
 FALLEN_GATE = 0.15  # m: a lying sighting may be this far from where the object stood (a bottle's center moves ~9 cm when it falls)
-HELD_RADIUS = 0.2  # m: a sighting this close to the held object, same color, is the held object
+HELD_RADIUS = 0.2  # m: a sighting this close to the held object, same color and kind, is the held object
 MAX_RANGE = 2.5  # m: further away, the detector may miss it, don't count as missing
 AXIS = (-0.05, -0.025, 0.0, 0.025, 0.05)  # m above / below the center: points checked up the object
 ENOUGH = 3  # of the AXIS points must be in view and uncovered
@@ -101,6 +101,11 @@ class World:
     def hold(self, object_id):
         self.held = object_id if object_id in self.objects else None
 
+    def carried(self, position):
+        """The held object moved with the hand: it is at `position` now."""
+        if self.held is not None:
+            self.objects[self.held].position = np.asarray(position, float)
+
     def release(self, position=None):
         """The held object stands somewhere again: at `position` if given."""
         if self.held is not None and position is not None:
@@ -116,7 +121,9 @@ class World:
         near = [
             (np.hypot(*(s.position[:2] - obj.position[:2])), i)
             for i, s in enumerate(seen)
-            if s.color == obj.color and np.hypot(*(s.position[:2] - obj.position[:2])) < HELD_RADIUS
+            if s.color == obj.color
+            and (s.kind is None or obj.kind is None or s.kind == obj.kind)
+            and np.hypot(*(s.position[:2] - obj.position[:2])) < HELD_RADIUS
         ]
         return min(near)[1] if near else None
 

@@ -1,6 +1,6 @@
 """Runs skills (g1/skills.py) one at a time: the robot's hands and feet for whoever gives commands.
 
-A command is JSON text: {"skill": "look_around"} | {"skill": "go_to", "place": "table_a"}
+A command is JSON text: {"skill": "look_around", "find": "blue bottle"} | {"skill": "go_to", "place": "table_a"}
 | {"skill": "pick", "object": 3} or {"skill": "pick", "label": "red can"}
 | {"skill": "place", "target": "mark"} or {"target": {"next_to": 5}} or {"target": {"next_to": "blue bottle"}}
 | {"skill": "stop"}: stop walking and moving the arm now.
@@ -13,7 +13,8 @@ Inputs:  command      JSON text, one skill (commander now, the language model in
          arm_status   which arm command finished (arm)
          objects      the memory (world)
 Outputs: cmd_vel, arm_command   to locomotion and arm, as task did
-         held                    [object id, x, y, z] when picked up, [-1, x, y, z] when put down (to world)
+         held                    [object id, nan x3] when picked up, [object id, x, y, z] where the hand
+                                 carries it (every CARRIED_MOVE), [-1, x, y, z] when put down (to world)
          arm_area                [x, y] where the arm works at a table, [nan, nan] when done (to world)
          status                  text: the skill and step now running
          result                  JSON text: {"skill", "ok", "message"} when a skill ends
@@ -32,14 +33,15 @@ r = skills.Robot()
 skill = None
 label = ""
 arm_area_sent = None
+carried_sent = None
+CARRIED_MOVE = 0.05  # m: tell the memory where the held object is when the hand moved this far
 node = Node()
 
 
 def find(text):
     """A label like "red can" -> the id of a remembered object, or None."""
-    words = text.lower().split()
     for o in r.objects:
-        if all(w in (o["color"], o["kind"], f"#{o['id']}", str(o["id"])) for w in words):
+        if skills.matches(o, text):
             return o["id"]
     return None
 
@@ -48,7 +50,7 @@ def make(command):
     """JSON command -> a Skill, or a Result if it can't even start."""
     name = command.get("skill")
     if name == "look_around":
-        return skills.LookAround()
+        return skills.LookAround(command.get("find", ""))
     if name == "go_to":
         return skills.GoTo(command.get("place", ""))
     if name == "pick":
@@ -126,6 +128,11 @@ for event in node:
             where = r.released_at if r.held is None and r.released_at is not None else [np.nan] * 3
             node.send_output("held", pa.array([float(r.held if r.held is not None else -1), *where]))
             r.released_at = None
+            carried_sent = None
+        at = skills.carried_at(r, skill)
+        if at is not None and (carried_sent is None or np.linalg.norm(at - carried_sent) > CARRIED_MOVE):
+            node.send_output("held", pa.array([float(r.held), *at]))
+            carried_sent = at
         if skill.label != label:
             label = skill.label
             node.send_output("status", pa.array([f"{skill.name}: {label}"]))

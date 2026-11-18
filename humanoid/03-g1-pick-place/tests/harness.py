@@ -90,6 +90,8 @@ class Bench:
                     else:
                         self.memory.release(r.released_at)
                         r.released_at = None
+                if r.held is not None:
+                    self.memory.carried(skills.carried_at(r, skill))
                 if skill.label != label:
                     label = skill.label
                     self.log.append(f"t={t:6.2f}  {skill.name}: {label}")

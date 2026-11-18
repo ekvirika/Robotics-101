@@ -31,6 +31,9 @@ LOOK_TIME = 2.0  # s per table: about 6 detector images
 STOP_WAIT = 0.5  # s: after stopping, wait for a fresh "standing"
 
 
+LOOKS_AT = ("table_a", "table_a", "table_b")  # the table each look of look_around_plan faces, in order
+
+
 def look_around_plan():
     x, y = SURVEY_SPOT
     return [
