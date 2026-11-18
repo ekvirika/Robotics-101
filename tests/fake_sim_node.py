@@ -3,12 +3,15 @@ task's dora graph on any computer. Same inputs and outputs; the robot is the
 stand-in G1 of tests/fakes.py (exact walking, real arm kinematics, no physics).
 
 Use it in place of the sim node: path python, args tests/fake_sim_node.py,
-with TASK = G1-Crowd-Crossing-v0 or G1-Pick-Place-v0 (and SEED for the crowd).
-It stops after the task's time limit and prints how the episode went.
+with TASK = G1-Crowd-Crossing-v0, G1-Pick-Place-v0 or G1-Tell-The-Robot-v0 (and
+SEED for the crowd). It stops after the task's time limit and prints how the
+episode went. REAL_TIME=1 keeps it at the speed of a real robot (for a person
+or a language model in the loop); otherwise it runs as fast as it can.
 """
 
 import os
 import sys
+import time
 from pathlib import Path
 
 import numpy as np
@@ -17,7 +20,7 @@ from dora import Node
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from area.crowd import Crowd  # noqa: E402
-from fakes import PERSON_RADIUS, FakeG1  # noqa: E402
+from fakes import PERSON_RADIUS, FakeG1, FakeRoom  # noqa: E402
 from g1 import joints, messages  # noqa: E402
 from g1.planner import ROBOT_RADIUS  # noqa: E402
 from g1.tracker import SCAN_DT  # noqa: E402
@@ -32,6 +35,13 @@ if task == "G1-Crowd-Crossing-v0":
     )
     robot = FakeG1(start=layout.START, people=lambda: crowd.position)
     objects = []
+elif task == "G1-Tell-The-Robot-v0":
+    from tasks.tell_the_robot import layout
+
+    robot = FakeRoom(
+        layout.OBJECTS, [layout.box_of(t) for t in layout.TABLES], layout.TABLE_SIZE[2], start=layout.START
+    )
+    objects = [t.name for t in layout.OBJECTS]
 else:
     from tasks.pick_and_place import layout
 
@@ -45,7 +55,11 @@ else:
 
 node = Node()
 next_scan, closest = 0.0, np.inf
+real_time = os.environ.get("REAL_TIME") == "1"
+wall_start = time.monotonic()
 while robot.time() < layout.TIME_LIMIT:
+    if real_time:
+        time.sleep(max(0.0, wall_start + robot.time() - time.monotonic()))
     while True:  # every command that has arrived
         event = node.next(timeout=1e-4)
         if event is None or event["type"] not in ("INPUT", "STOP"):
@@ -85,7 +99,7 @@ while robot.time() < layout.TIME_LIMIT:
     if crowd is not None and np.hypot(layout.GOAL[0] - x, layout.GOAL[1] - y) < 0.3 and robot.speed() < 0.05:
         print(f"RESULT arrived at t={robot.time():.1f}s, closest free space {100 * closest:.0f} cm", flush=True)
         break
-    if crowd is None and robot.bottle is not None and not robot.held and robot.time() > 1.0:
+    if crowd is None and getattr(robot, "bottle", None) is not None and not robot.held and robot.time() > 1.0:
         off = np.hypot(robot.bottle[0] - layout.PLACE_MARK[0], robot.bottle[1] - layout.PLACE_MARK[1])
         if off < 0.03 and robot.bottle[2] > layout.TABLE_SIZE[2]:
             print(f"RESULT bottle on the mark at t={robot.time():.1f}s ({100 * off:.1f} cm off)", flush=True)

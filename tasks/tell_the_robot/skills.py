@@ -207,6 +207,22 @@ class Body:
         return deepest
 
 
+def pick_problem(body, obj):
+    """Why `obj` (remembered) can't be picked from where it stands, or None. Pick and
+    the object list the language model reads both use this, so they never disagree."""
+    table = table_under(obj.position)
+    if table is None:
+        return f"can't pick {obj.label}: it is not on a table"
+    stance = body.stance(obj.position[:2], table)
+    if not body.reachable(obj.position, stance):
+        depth, deepest = 100 * depth_on(table, obj.position), 100 * body.max_depth
+        return f"can't reach {obj.label}: {depth:.0f} cm from the edge of {table}, the hand reaches {deepest:.0f} cm"
+    blocker = in_hand_way(stance, obj.position, body.memory.others(but=obj.name))
+    if blocker is not None:
+        return f"can't pick {obj.label}: {blocker.label} is where the hand comes in"
+    return None
+
+
 class Skill:
     name = "skill"
 
@@ -394,20 +410,11 @@ class Pick(Skill):
         if obj is None:
             return Result(False, f"I don't know object #{self.object_id}; look around first")
         self.obj = obj
-        table = table_under(obj.position)
-        if table is None:
-            return Result(False, f"can't pick {obj.label}: it is not on a table")
+        problem = pick_problem(self.body, obj)
+        if problem:
+            return Result(False, problem)
         self.start_position = np.array(obj.position)
-        self.stance = self.body.stance(obj.position[:2], table)
-        if not self.body.reachable(obj.position, self.stance):
-            depth, deepest = 100 * depth_on(table, obj.position), 100 * self.body.max_depth
-            return Result(
-                False,
-                f"can't reach {obj.label}: {depth:.0f} cm from the edge of {table}, the hand reaches {deepest:.0f} cm",
-            )
-        blocker = in_hand_way(self.stance, obj.position, self.memory.others(but=obj.name))
-        if blocker is not None:
-            return Result(False, f"can't pick {obj.label}: {blocker.label} is where the hand comes in")
+        self.stance = self.body.stance(obj.position[:2], table_under(obj.position))
         center = lambda: np.array(self.memory.objects[obj.name].position)  # noqa: E731
         return [
             self.arm("raise the hands", self.body.raise_hands),

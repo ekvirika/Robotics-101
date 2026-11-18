@@ -19,6 +19,11 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = ["pytest", "ruff", "pre-commit"]
+agent = ["anthropic>=0.70"]  # tasks/tell_the_robot: the language model that plans with the skills
+voice = [  # tasks/tell_the_robot: push-to-talk on the computer with the microphone (Apple Silicon)
+    "mlx-whisper>=0.4; sys_platform == 'darwin'",
+    "sounddevice>=0.5",
+]
 
 [build-system]
 requires = ["setuptools>=68"]
@@ -27,7 +32,7 @@ build-backend = "setuptools.build_meta"
 # Three packages: the robot (source/g1), the places it works in (source/area)
 # and the tasks (tasks/), installed together with `pip install -e .`
 [tool.setuptools]
-packages = ["g1", "g1.nodes", "area", "tasks", "tasks.crossing", "tasks.pick_and_place", "tasks.pick_and_place.nodes", "tasks.tell_the_robot"]
+packages = ["g1", "g1.nodes", "area", "tasks", "tasks.crossing", "tasks.pick_and_place", "tasks.pick_and_place.nodes", "tasks.tell_the_robot", "tasks.tell_the_robot.nodes"]
 
 [tool.setuptools.package-dir]
 g1 = "source/g1"
@@ -83,6 +88,7 @@ ignore = [
 
 [tool.ruff.lint.per-file-ignores]
 "__init__.py" = ["F401"]  # Allow unused imports in __init__.py files
+"tasks/tell_the_robot/agent.py" = ["E501"]  # the system prompt and tool descriptions: sentences the model reads
 
 [tool.ruff.lint.mccabe]
 max-complexity = 30

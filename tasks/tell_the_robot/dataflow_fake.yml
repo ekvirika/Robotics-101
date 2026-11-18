@@ -1,0 +1,65 @@
+# Tell the robot, on any computer: the whole graph with the stand-in robot instead of Isaac Lab.
+#
+#   chat ──text──▶ agent ──command──▶ skills ◀──base_pose, robot_state, scan, object_pose── sim
+#     ▲              │  ▲                │                                                   ▲
+#     └────reply─────┤  └─result, objects, held                                            │
+#                    └──reply──▶ voice            skills ──cmd_vel, upper_body, hands───────┘
+#
+# sim:    tests/fake_sim_node.py (FakeRoom: exact walking, real arm kinematics, no physics), real time
+# skills: the skills and the memory (nodes/skills.py)
+# agent:  Claude through tools (nodes/agent.py); needs a key in the environment (nodes/agent.py says which)
+# voice:  speaks every reply (macOS say); chat: type or speak, started by hand in a second terminal:
+#           python tasks/tell_the_robot/nodes/chat.py
+#
+# From this folder, with the repository's environment in .venv (pip install -e ".[agent,voice]"; dora 1.1.0
+# needs a file path, a bare "python" is not looked up):
+#   dora run dataflow_fake.yml
+
+nodes:
+  - id: sim
+    path: ../../.venv/bin/python
+    args: -u ../../tests/fake_sim_node.py
+    inputs:
+      cmd_vel: skills/cmd_vel
+      upper_body: skills/upper_body
+      hands: skills/hands
+    outputs: [base_pose, robot_state, scan, object_pose]
+    env:
+      TASK: G1-Tell-The-Robot-v0
+      REAL_TIME: "1"
+
+  - id: skills
+    path: ../../.venv/bin/python
+    args: -u nodes/skills.py
+    inputs:
+      base_pose: sim/base_pose
+      robot_state: sim/robot_state
+      scan: sim/scan
+      object_pose: sim/object_pose
+      command: agent/command
+    outputs: [cmd_vel, upper_body, hands, result, objects, held, status]
+
+  - id: agent
+    path: ../../.venv/bin/python
+    args: -u nodes/agent.py
+    inputs:
+      tick: dora/timer/millis/100
+      text: chat/text
+      result: skills/result
+      objects: skills/objects
+      held: skills/held
+    outputs: [command, reply, log]
+    env:
+      AGENT_SCRIPT: "" # sentences separated by |, sent one by one when idle
+
+  - id: voice
+    path: ../../.venv/bin/python
+    args: -u nodes/voice.py
+    inputs:
+      reply: agent/reply
+
+  - id: chat
+    path: dynamic
+    inputs:
+      reply: agent/reply
+    outputs: [text]

@@ -32,6 +32,7 @@ class DoraG1(G1):
         self._state = None
         self._scan = None
         self.stopped = False
+        self.inbox = []  # inputs that are not the robot's (e.g. a task's commands), for the node to read
         while self._state is None or any(name not in self.objects for name in objects):  # the first full state
             self._receive()
         _, _, _, upper, hands = self._state
@@ -92,6 +93,9 @@ class DoraG1(G1):
             self.stopped = True
             raise SystemExit(0)
         if event["type"] != "INPUT":
+            return
+        if event["id"] not in ("base_pose", "robot_state", "scan", "object_pose"):
+            self.inbox.append(event)
             return
         value = event["value"].to_numpy()
         if event["id"] == "base_pose":
