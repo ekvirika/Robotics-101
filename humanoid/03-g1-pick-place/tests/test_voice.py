@@ -26,6 +26,28 @@ def test_a_tap_or_silence_is_heard_as_nothing():
     assert voice.transcribe(np.full(int(0.1 * voice.SAMPLE_RATE), 0.3, np.float32), model="never-loaded") == ""
 
 
+def _speech(seconds, rng):
+    t = np.arange(int(seconds * voice.SAMPLE_RATE)) / voice.SAMPLE_RATE
+    return (0.1 * np.sin(2 * np.pi * 220 * t) * (0.6 + 0.4 * np.sin(2 * np.pi * 3 * t))).astype(np.float32) + _room(seconds, rng)
+
+
+def _room(seconds, rng):
+    return rng.normal(0, 0.003, int(seconds * voice.SAMPLE_RATE)).astype(np.float32)
+
+
+def test_recording_ends_after_a_pause_following_speech():
+    rng = np.random.default_rng(0)
+    assert voice.speech_ended(np.concatenate([_room(0.5, rng), _speech(2.0, rng), _room(1.1, rng)]))
+    assert not voice.speech_ended(np.concatenate([_room(0.5, rng), _speech(2.0, rng), _room(0.5, rng)]))
+    assert not voice.speech_ended(np.concatenate([_room(0.5, rng), _speech(2.0, rng)]))
+
+
+def test_room_noise_alone_never_ends_a_recording():
+    rng = np.random.default_rng(1)
+    assert not voice.speech_ended(_room(5.0, rng))
+    assert not voice.speech_ended(rng.normal(0, 0.02, 5 * voice.SAMPLE_RATE).astype(np.float32))
+
+
 def test_the_dashboard_finds_every_loose_object_and_not_the_robot():
     source = (LESSON / "nodes" / "dashboard.py").read_text()
     start = source.index("def free_objects")

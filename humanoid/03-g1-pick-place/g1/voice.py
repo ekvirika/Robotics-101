@@ -19,6 +19,9 @@ SAMPLE_RATE = 16000  # Hz, what Whisper expects
 VOCABULARY = "Put the blue bottle on the green mark. Table A, table B. Red, yellow, green, blue. Bottle, can, box. Stop."
 TOO_SHORT = 0.3  # s: a tap of the key, not a sentence
 TOO_QUIET = 0.001  # RMS of float audio in -1..1: nothing was said (a headset mic speaking is about 0.004)
+PAUSE = 1.0  # s of quiet after speech: the sentence is over, recording stops by itself
+SPEECH = 0.01  # RMS: louder than this, and 3x the room's floor, is speech
+LONGEST = 15.0  # s: a recording stops here even without a pause
 MIC = "MacBook"  # the built-in mic; a Bluetooth headset may be the default input and is quiet
 
 
@@ -58,6 +61,20 @@ def microphone(name=MIC):
     return None, default["name"]
 
 
+def speech_ended(audio, rate=SAMPLE_RATE, pause=PAUSE):
+    """Speech, then `pause` seconds without it: the speaker finished. False before anyone spoke.
+
+    Loudness per 0.1 s window, against the quietest tenth of the recording (the room)."""
+    window = rate // 10
+    count = len(audio) // window
+    tail = int(round(pause * 10))
+    if count <= tail:
+        return False
+    levels = np.sqrt(np.mean(np.asarray(audio[: count * window], np.float32).reshape(count, window) ** 2, axis=1))
+    loud = levels > max(SPEECH, 3 * float(np.percentile(levels, 10)))
+    return bool(loud[:-tail].any() and not loud[-tail:].any())
+
+
 def level(audio):
     """RMS of float audio: 0 is silence, speech close to a laptop mic is about 0.02 to 0.1."""
     return float(np.sqrt(np.mean(audio**2))) if len(audio) else 0.0
@@ -77,6 +94,11 @@ class Recorder:
             device=self.device, samplerate=SAMPLE_RATE, channels=1, dtype="float32", callback=lambda data, *_: self.chunks.append(data.copy())
         )
         self.stream.start()
+
+    def audio(self):
+        """What was recorded so far."""
+        chunks = list(self.chunks)
+        return np.concatenate(chunks).ravel() if chunks else np.zeros(0, np.float32)
 
     def stop(self):
         if self.stream is None:
