@@ -27,7 +27,7 @@ build-backend = "setuptools.build_meta"
 # Three packages: the robot (source/g1), the places it works in (source/area)
 # and the tasks (tasks/), installed together with `pip install -e .`
 [tool.setuptools]
-packages = ["g1", "g1.nodes", "area", "tasks", "tasks.crossing", "tasks.pick_and_place", "tasks.pick_and_place.nodes"]
+packages = ["g1", "g1.nodes", "area", "tasks", "tasks.crossing", "tasks.pick_and_place", "tasks.pick_and_place.nodes", "tasks.tell_the_robot"]
 
 [tool.setuptools.package-dir]
 g1 = "source/g1"

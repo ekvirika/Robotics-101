@@ -136,3 +136,38 @@ class FakeG1(G1):
             self.bottle[2] = self.table_height + 0.075 if on_table else 0.075  # set down (or dropped)
         if self.held:
             self.bottle = point
+
+
+class FakeRoom(FakeG1):
+    """The stand-in G1 in a room with several objects (tasks/tell_the_robot).
+
+    things: layout.Thing (name, height, start (x, y) on a table). Each object
+    behaves like FakeG1's bottle: held while the closed right hand's grasp
+    point is on it, set down on the table under it (or the floor) when the
+    hand opens. Perception.find(name) answers for every object.
+    """
+
+    def __init__(self, things, tables, table_height, start=(0.0, 0.0, 0.0)):
+        super().__init__(start=start, tables=tables, table_height=table_height)
+        self.objects = {t.name: np.array([*t.xy, table_height + t.height / 2]) for t in things}
+        self.heights = {t.name: t.height for t in things}
+        self.holding = None
+
+    def find(self, name):
+        return self.objects[name].copy(), 0.0
+
+    def step(self):
+        super().step()
+        closed = np.allclose(self.joint_positions(joints.RIGHT_HAND), self.closed, atol=1e-6)
+        point = self.grasp_point_world()
+        if closed and self.holding is None:
+            near = [(np.linalg.norm(point - p), n) for n, p in self.objects.items()]
+            distance, name = min(near)
+            if distance < GRASP_TOLERANCE:
+                self.holding = name
+        if self.holding is not None and not closed:
+            name, self.holding = self.holding, None
+            on_table = any(x0 <= point[0] <= x1 and y0 <= point[1] <= y1 for x0, y0, x1, y1 in self.tables)
+            self.objects[name][2] = (self.table_height if on_table else 0.0) + self.heights[name] / 2
+        if self.holding is not None:
+            self.objects[self.holding] = point
