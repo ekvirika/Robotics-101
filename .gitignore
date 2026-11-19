@@ -85,3 +85,6 @@ docs/superpowers/
 
 # dora run logs
 out/
+
+# keys (tasks/tell_the_robot/run_on_brev.sh)
+.env

@@ -1,0 +1,79 @@
+# Tell the robot, in Isaac Lab: the G1 and the skills on the GPU machine (brev), the language
+# model, the voice and the chat on the computer with the microphone and the key (mac).
+#
+#   brev:  sim ──base_pose, robot_state, scan, object_pose──▶ skills
+#           ▲                                                   │
+#           └──────────── cmd_vel, upper_body, hands ───────────┘
+#                                       command ▲   │ result, objects, held
+#   mac:   chat ──text──▶ agent ────────────────┘   │
+#           ▲               ◀───────────────────────┘
+#           └────reply──────┴──reply──▶ voice
+#
+# The 50 Hz loop (sim and skills) stays on one machine; only commands and results, a few
+# messages per skill, cross the link.
+#
+# Start it from the mac with run_on_brev.sh, which opens the SSH tunnel, starts the
+# coordinator and both daemons, and runs this file from this folder. Paths:
+#   brev  Isaac Lab in /workspace/isaaclab, this repository installed into it (README, Install),
+#         nodes started as modules, so they don't depend on the folder they start in
+#   mac   the repository's .venv (pip install -e ".[agent,voice]"), relative to this folder
+# Watch at <the Brev VS Code link>/viewer/ .
+
+nodes:
+  - id: sim
+    deploy:
+      machine: brev
+    path: /workspace/isaaclab/isaaclab.sh
+    args: -p -m g1.nodes.sim --livestream 2 --viz kit # or --headless: no picture
+    inputs:
+      cmd_vel: skills/cmd_vel
+      upper_body: skills/upper_body
+      hands: skills/hands
+    outputs: [base_pose, robot_state, scan, object_pose]
+    env:
+      TASK: G1-Tell-The-Robot-v0
+      OBJECTS: blue_bottle,red_can,yellow_bottle,green_box
+
+  - id: skills
+    deploy:
+      machine: brev
+    path: /workspace/isaaclab/isaaclab.sh
+    args: -p -u -m tasks.tell_the_robot.nodes.skills
+    inputs:
+      base_pose: sim/base_pose
+      robot_state: sim/robot_state
+      scan: sim/scan
+      object_pose: sim/object_pose
+      command: agent/command
+    outputs: [cmd_vel, upper_body, hands, result, objects, held, status]
+
+  - id: agent
+    deploy:
+      machine: mac
+    path: ../../.venv/bin/python
+    args: -u nodes/agent.py
+    inputs:
+      tick: dora/timer/millis/100
+      text: chat/text
+      result: skills/result
+      objects: skills/objects
+      held: skills/held
+    outputs: [command, reply, log]
+    env:
+      AGENT_SCRIPT: "" # sentences separated by |, sent one by one when idle
+
+  - id: voice
+    deploy:
+      machine: mac
+    path: ../../.venv/bin/python
+    args: -u nodes/voice.py
+    inputs:
+      reply: agent/reply
+
+  - id: chat
+    deploy:
+      machine: mac
+    path: dynamic
+    inputs:
+      reply: agent/reply
+    outputs: [text]

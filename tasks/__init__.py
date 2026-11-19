@@ -8,4 +8,4 @@
 Importing this package registers every task's environment with Isaac Lab.
 """
 
-from . import crossing, pick_and_place  # noqa: F401
+from . import crossing, pick_and_place, tell_the_robot  # noqa: F401
