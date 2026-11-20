@@ -29,12 +29,13 @@ from dora import Node
 from tasks.tell_the_robot import voice
 
 SPEAKING = os.environ.get("CHAT_VOICE", "1") != "0"
-MODEL = os.environ.get("WHISPER_MODEL", voice.MODEL)
+MODEL = os.environ.get("WHISPER_MODEL", voice.CONVERSATION_MODEL)
 MIC = os.environ.get("CHAT_MIC", voice.MIC)
 AUTO_STOP = os.environ.get("CHAT_AUTO_STOP", "1") != "0"
 HANDS_FREE = SPEAKING and os.environ.get("CHAT_HANDS_FREE", "1") != "0"
 QUIET_RESTART = 10.0  # s: no speech this long, drop all but the last PRE_ROLL (the floor stays current)
 PAUSE = float(os.environ.get("CHAT_PAUSE", "1.6"))  # s of quiet that ends a hands-free sentence: room to think
+ECHO = 0.5  # s after the robot stops talking before listening: the room still rings with its voice
 PRE_ROLL = 1.0  # s kept across that drop: the first word of a sentence starting right then
 
 node = Node("chat")
@@ -45,11 +46,14 @@ def warm_up():
     voice.transcribe(np.full(voice.SAMPLE_RATE, 0.01, np.float32), MODEL)
 
 
-def hear_one(recorder):
+def hear_one(recorder, speech):
     """Hands-free: the next sentence a person says, as audio. Never while the robot talks."""
     while True:
         while voice.robot_speaking():
             time.sleep(0.2)
+        time.sleep(ECHO)
+        if voice.robot_speaking():
+            continue
         recorder.start()
         start = time.monotonic()
         while True:
@@ -58,9 +62,9 @@ def hear_one(recorder):
                 recorder.stop()
                 break
             audio = recorder.audio()
-            if voice.speech_ended(audio, pause=PAUSE):
+            if voice.speech_ended(audio, pause=PAUSE, speech=speech):
                 return recorder.stop()
-            spoke = voice.speech_started(audio)
+            spoke = voice.speech_started(audio, speech=speech)
             waited = time.monotonic() - start
             if not spoke and waited > QUIET_RESTART:
                 recorder.keep_last(PRE_ROLL)  # a fresh floor, without losing a sentence starting now
@@ -72,15 +76,19 @@ def hear_one(recorder):
 def listen_hands_free():
     device, mic = voice.microphone(MIC)
     print(f"microphone: {mic}. Just speak; the sentence is sent after a {PAUSE:g} s pause.", flush=True)
+    speech = float(
+        os.environ.get("CHAT_SPEECH") or (voice.SPEECH if "macbook" in mic.lower() else voice.HEADSET_SPEECH)
+    )
+    print(f"speech above level {speech:g}", flush=True)
     recorder = voice.Recorder(device)
     while True:
         try:
-            audio = hear_one(recorder)
+            audio = hear_one(recorder, speech)
         except Exception as error:
             print(f"(microphone failed: {error})", flush=True)
             return
         heard = voice.transcribe(audio, MODEL)
-        if heard:
+        if voice.has_words(heard):
             print(f"you said: {heard}", flush=True)
             node.send_output("text", pa.array([heard]), {"spoken": True})
 

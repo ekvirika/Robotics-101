@@ -15,14 +15,17 @@ import subprocess
 import numpy as np
 
 MODEL = "mlx-community/whisper-small.en-mlx"
+CONVERSATION_MODEL = "mlx-community/whisper-large-v3-turbo"  # hands-free: short answers like "table B" need it
 SAMPLE_RATE = 16000  # Hz, what Whisper expects
 VOCABULARY = (
-    "Put the blue bottle on the green mark. Table A, table B. Red, yellow, green, blue. Bottle, can, box. Stop."
+    "Put the blue bottle on the green mark. Put the red can next to the blue bottle. On table A, on table B. "
+    "Red, yellow, green, blue. Bottle, can, box. Yes, no. Stop."
 )
 TOO_SHORT = 0.3  # s: a tap of the key, not a sentence
 TOO_QUIET = 0.001  # RMS of float audio in -1..1: nothing was said (a headset mic speaking is about 0.004)
 PAUSE = 1.0  # s of quiet after speech: the sentence is over, recording stops by itself
 SPEECH = 0.01  # RMS: louder than this, and 3x the room's floor, is speech
+HEADSET_SPEECH = 0.002  # the same for a headset mic, which records about 5x quieter (ACCENTUM: 0.004 speaking)
 LONGEST = 15.0  # s: a recording stops here even without a pause
 MIC = "MacBook"  # the built-in mic; a Bluetooth headset may be the default input and is quiet
 
@@ -46,6 +49,11 @@ def transcribe(audio, model=MODEL):
     return result["text"].strip()
 
 
+def has_words(text):
+    """A transcript worth sending: at least one letter (noise comes back as "!" or "...")."""
+    return bool(re.search(r"[A-Za-z]", text or ""))
+
+
 def normalized(text):
     """Lowercase words without punctuation: how two transcripts are compared."""
     return " ".join(re.sub(r"[^a-z0-9' ]", " ", text.lower()).split())
@@ -63,7 +71,7 @@ def microphone(name=MIC):
     return None, default["name"]
 
 
-def speech_ended(audio, rate=SAMPLE_RATE, pause=PAUSE):
+def speech_ended(audio, rate=SAMPLE_RATE, pause=PAUSE, speech=SPEECH):
     """Speech, then `pause` seconds without it: the speaker finished. False before anyone spoke.
 
     Loudness per 0.1 s window, against the quietest tenth of the recording (the room)."""
@@ -73,18 +81,18 @@ def speech_ended(audio, rate=SAMPLE_RATE, pause=PAUSE):
     if count <= tail:
         return False
     levels = np.sqrt(np.mean(np.asarray(audio[: count * window], np.float32).reshape(count, window) ** 2, axis=1))
-    loud = levels > max(SPEECH, 3 * float(np.percentile(levels, 10)))
+    loud = levels > max(speech, 3 * float(np.percentile(levels, 10)))
     return bool(loud[:-tail].any() and not loud[-tail:].any())
 
 
-def speech_started(audio, rate=SAMPLE_RATE):
+def speech_started(audio, rate=SAMPLE_RATE, speech=SPEECH):
     """Someone spoke somewhere in `audio` (same loudness rule as speech_ended)."""
     window = rate // 10
     count = len(audio) // window
     if count < 3:
         return False
     levels = np.sqrt(np.mean(np.asarray(audio[: count * window], np.float32).reshape(count, window) ** 2, axis=1))
-    return bool((levels > max(SPEECH, 3 * float(np.percentile(levels, 10)))).any())
+    return bool((levels > max(speech, 3 * float(np.percentile(levels, 10)))).any())
 
 
 def robot_speaking():
