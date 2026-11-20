@@ -8,7 +8,7 @@ second terminal on the computer with the microphone:
 Typing: a sentence, then Enter. Speaking: Enter on an
 empty line starts the microphone; it stops after a 1 s pause, after 15 s, or on Enter; Whisper turns it into
 text on this Mac (tasks/tell_the_robot/voice.py) and the text goes to the robot as if typed.
-By default it listens hands-free: speak, pause 1 s, and the sentence goes; never while the robot talks
+By default it listens hands-free: speak, pause 1.6 s (CHAT_PAUSE), and the sentence goes; never while the robot talks
 (CHAT_HANDS_FREE=0 goes back to Enter first). CHAT_VOICE=0 turns speaking off,
 CHAT_AUTO_STOP=0 waits for Enter only, WHISPER_MODEL picks the model, CHAT_MIC the
 microphone by part of its name (default: the MacBook's own, not a headset).
@@ -34,6 +34,7 @@ MIC = os.environ.get("CHAT_MIC", voice.MIC)
 AUTO_STOP = os.environ.get("CHAT_AUTO_STOP", "1") != "0"
 HANDS_FREE = SPEAKING and os.environ.get("CHAT_HANDS_FREE", "1") != "0"
 QUIET_RESTART = 10.0  # s: no speech this long, drop all but the last PRE_ROLL (the floor stays current)
+PAUSE = float(os.environ.get("CHAT_PAUSE", "1.6"))  # s of quiet that ends a hands-free sentence: room to think
 PRE_ROLL = 1.0  # s kept across that drop: the first word of a sentence starting right then
 
 node = Node("chat")
@@ -57,7 +58,7 @@ def hear_one(recorder):
                 recorder.stop()
                 break
             audio = recorder.audio()
-            if voice.speech_ended(audio):
+            if voice.speech_ended(audio, pause=PAUSE):
                 return recorder.stop()
             spoke = voice.speech_started(audio)
             waited = time.monotonic() - start
@@ -70,7 +71,7 @@ def hear_one(recorder):
 
 def listen_hands_free():
     device, mic = voice.microphone(MIC)
-    print(f"microphone: {mic}. Just speak; the sentence is sent after a 1 s pause.", flush=True)
+    print(f"microphone: {mic}. Just speak; the sentence is sent after a {PAUSE:g} s pause.", flush=True)
     recorder = voice.Recorder(device)
     while True:
         try:
