@@ -57,12 +57,12 @@ stop() {
 }
 trap stop EXIT
 
-ssh -N -o ExitOnForwardFailure=yes \
+ssh -N -o ExitOnForwardFailure=yes -o ControlMaster=no -o ControlPath=none \
     -L "$COORD:127.0.0.1:$COORD" -L "$PEER_B:127.0.0.1:$PEER_B" -R "$PEER_M:127.0.0.1:$PEER_M" \
     "$host" &
 tunnel=$!
 sleep 3
-kill -0 "$tunnel" 2>/dev/null || { echo "SSH tunnel to $host failed" >&2; exit 1; }
+kill -0 "$tunnel" 2>/dev/null || { echo "SSH tunnel to $host failed" >&2; exit 1; }  # its own connection: brev's shared one would take the forwards
 
 on_brev "git -C $BREV_REPO pull -q --ff-only && git -C $BREV_REPO log --oneline -1"
 on_brev_detached "dora coordinator --port $COORD >/tmp/ttr-coordinator.log 2>&1"
