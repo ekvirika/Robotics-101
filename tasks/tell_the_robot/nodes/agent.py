@@ -39,6 +39,7 @@ brain = agent.Agent(Anthropic())
 worker = ThreadPoolExecutor(max_workers=1)
 thinking = None  # Future of agent.think()
 conductor = None  # the calls of the current turn
+cancelled = False  # a stop came while thinking: the answer is closed, not run
 objects, held = [], None
 said = os.environ.get("ROBOT_SAY") or os.environ.get("AGENT_SCRIPT", "")  # ROBOT_SAY from the shell wins
 script = [s.strip() for s in said.split("|") if s.strip()]
@@ -81,10 +82,13 @@ def advance():
 
 
 def hear(text):
-    global conductor, thinking
+    global conductor, thinking, cancelled
     if text.lower().strip(" .!") in ("stop", "halt"):
         send("command", json.dumps({"skill": "stop"}))
-        conductor, thinking = None, None
+        if conductor is not None:
+            brain.give(conductor.stop())
+        cancelled = thinking is not None  # the turn on its way: its calls are closed as stopped on arrival
+        conductor = None
         send("reply", "Stopped.")
         log("heard stop: robot stopped")
         return
@@ -123,8 +127,14 @@ for event in node:
             try:
                 turn = future.result()
             except Exception as error:  # the API call failed: say so, keep running
+                cancelled = False
                 send("reply", f"I can't think right now: {type(error).__name__}.")
                 log(f"model error: {error}")
+                continue
+            if cancelled:
+                cancelled = False
+                if not turn.done:
+                    brain.give(agent.Conductor(turn).stop())
                 continue
             if turn.done:
                 send("reply", turn.text)

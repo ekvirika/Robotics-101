@@ -313,6 +313,13 @@ class Conductor:
         call, self.waiting = self.waiting, None
         self.results.append((call.id, message if ok else f"FAILED: {message}", not ok))
 
+    def stop(self, why="stopped by a person"):
+        """Every call still open gets `why` as its result: the model's history stays valid."""
+        open_calls = ([self.waiting] if self.waiting else []) + self.calls
+        self.results += [(call.id, f"FAILED: {why}", True) for call in open_calls]
+        self.waiting, self.calls = None, []
+        return self.results
+
 
 def converse(agent, text, robot, max_turns=20, on_call=None):
     """One request from start to reply, for a robot with objects(), held() and run(command) -> (ok, message).

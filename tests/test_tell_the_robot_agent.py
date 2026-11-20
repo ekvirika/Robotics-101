@@ -158,3 +158,20 @@ def test_the_object_list_says_what_pick_would_say():
     assert "#2 red can on table_a at (1.60, 0.00): can't be picked: can't reach #2 red can: 30 cm" in text
     assert text.endswith("The hand is empty.")
     assert "#1 blue bottle: in the hand" in agent.describe_objects(objects, 1)
+
+
+def test_stop_closes_every_open_call():
+    turn = NS(calls=[agent.Call("a", "pick", {"object_id": 1}), agent.Call("b", "place", {"target": "mark"})])
+    conductor = agent.Conductor(turn)
+    conductor.waiting = conductor.calls.pop(0)
+    results = conductor.stop()
+    assert [(i, error) for i, _, error in results] == [("a", True), ("b", True)]
+    assert conductor.done
+
+
+def test_made_up_segments_are_dropped():
+    from tasks.tell_the_robot import voice
+
+    assert voice.believable({"no_speech_prob": 0.1, "compression_ratio": 1.2})
+    assert not voice.believable({"no_speech_prob": 0.9, "compression_ratio": 1.2})
+    assert not voice.believable({"no_speech_prob": 0.1, "compression_ratio": 3.5})

@@ -46,7 +46,17 @@ def transcribe(audio, model=MODEL):
         condition_on_previous_text=False,
         temperature=0.0,
     )
-    return result["text"].strip()
+    kept = [s["text"] for s in result.get("segments", []) if believable(s)]
+    return " ".join(t.strip() for t in kept).strip() if "segments" in result else result["text"].strip()
+
+
+NOT_SPEECH = 0.6  # Whisper's own probability that a segment is silence: above it, the text is made up
+REPETITIVE = 2.4  # gzip compression ratio: above it, a segment repeats itself ("I'm going to go. I'm going to go.")
+
+
+def believable(segment):
+    """A segment Whisper heard, not one it invented from room noise."""
+    return segment.get("no_speech_prob", 0.0) < NOT_SPEECH and segment.get("compression_ratio", 1.0) < REPETITIVE
 
 
 def has_words(text):
@@ -143,6 +153,16 @@ class Recorder:
         return np.concatenate(self.chunks).ravel() if self.chunks else np.zeros(0, np.float32)
 
 
+def speaker_device(name=MIC):
+    """The `say -a` id of the output whose name contains `name` (the headset), else None (default output)."""
+    listing = subprocess.run(["say", "-a", "?"], capture_output=True, text=True).stdout
+    for line in listing.splitlines():
+        number, _, found = line.strip().partition(" ")
+        if name and name.lower() in found.lower():
+            return number
+    return None
+
+
 def hush():
     """Stop any sentence `say` is speaking: the robot must not talk into the microphone."""
     subprocess.run(["killall", "say"], capture_output=True)
@@ -151,8 +171,13 @@ def hush():
 class Speaker:
     """Says one sentence at a time with macOS `say`; a new one stops the old one."""
 
-    def __init__(self, voice=None, rate=None):
-        self.args = ["say"] + (["-v", voice] if voice else []) + (["-r", str(rate)] if rate else [])
+    def __init__(self, voice=None, rate=None, device=None):
+        self.args = (
+            ["say"]
+            + (["-v", voice] if voice else [])
+            + (["-r", str(rate)] if rate else [])
+            + (["-a", device] if device else [])
+        )
         self.process = None
 
     def say(self, text):
