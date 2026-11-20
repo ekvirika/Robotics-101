@@ -38,3 +38,15 @@ def test_room_noise_alone_never_ends_a_recording():
     rng = np.random.default_rng(1)
     assert not voice.speech_ended(_room(5.0, rng))
     assert not voice.speech_ended(rng.normal(0, 0.02, 5 * voice.SAMPLE_RATE).astype(np.float32))
+
+
+def test_only_sentences_for_the_robot_are_sent():
+    from tasks.tell_the_robot.voice import addressed
+
+    assert addressed("Robot, put the red can on table B.") == "put the red can on table B."
+    assert addressed("Hey robot put it on the mark") == "put it on the mark"
+    assert addressed("Okay, robot. Stop.") == "Stop."
+    assert addressed("Robot.") == ""
+    assert addressed("I'll be turning to the skip house.") is None
+    assert addressed("The robot is slow") is None
+    assert addressed("anything", wake="") == "anything"

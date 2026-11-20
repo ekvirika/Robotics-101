@@ -8,7 +8,8 @@ second terminal on the computer with the microphone:
 Typing: a sentence, then Enter. Speaking: Enter on an
 empty line starts the microphone; it stops after a 1 s pause, after 15 s, or on Enter; Whisper turns it into
 text on this Mac (tasks/tell_the_robot/voice.py) and the text goes to the robot as if typed.
-By default it listens hands-free: speak, pause 1.6 s (CHAT_PAUSE), and the sentence goes; never while the robot talks
+By default it listens hands-free: "Robot, ..." then a 1.6 s pause (CHAT_PAUSE) sends the rest; other
+speech in the room is ignored (CHAT_WAKE="" sends everything); never while the robot talks
 (CHAT_HANDS_FREE=0 goes back to Enter first). CHAT_VOICE=0 turns speaking off,
 CHAT_AUTO_STOP=0 waits for Enter only, WHISPER_MODEL picks the model, CHAT_MIC the
 microphone by part of its name (default: the ACCENTUM headset, which hears the speaker, not the room).
@@ -36,6 +37,7 @@ HANDS_FREE = SPEAKING and os.environ.get("CHAT_HANDS_FREE", "1") != "0"
 QUIET_RESTART = 10.0  # s: no speech this long, drop all but the last PRE_ROLL (the floor stays current)
 PAUSE = float(os.environ.get("CHAT_PAUSE", "1.6"))  # s of quiet that ends a hands-free sentence: room to think
 ECHO = 0.5  # s after the robot stops talking before listening: the room still rings with its voice
+WAKE = os.environ.get("CHAT_WAKE", "robot").lower()  # hands-free: only "Robot, ..." is sent; "" sends all
 PRE_ROLL = 1.0  # s kept across that drop: the first word of a sentence starting right then
 
 node = Node("chat")
@@ -75,7 +77,10 @@ def hear_one(recorder, speech):
 
 def listen_hands_free():
     device, mic = voice.microphone(MIC)
-    print(f"microphone: {mic}. Just speak; the sentence is sent after a {PAUSE:g} s pause.", flush=True)
+    print(
+        f'microphone: {mic}. Start with "{WAKE.title()}, ..."; the sentence is sent after a {PAUSE:g} s pause.',
+        flush=True,
+    )
     speech = float(
         os.environ.get("CHAT_SPEECH") or (voice.SPEECH if "macbook" in mic.lower() else voice.HEADSET_SPEECH)
     )
@@ -88,9 +93,16 @@ def listen_hands_free():
             print(f"(microphone failed: {error})", flush=True)
             return
         heard = voice.transcribe(audio, MODEL)
-        if voice.has_words(heard):
-            print(f"you said: {heard}", flush=True)
-            node.send_output("text", pa.array([heard]), {"spoken": True})
+        if not voice.has_words(heard):
+            continue
+        request = voice.addressed(heard, WAKE)
+        if request is None:
+            print(f"(not for the robot: {heard})", flush=True)
+        elif not request:
+            print('(heard "robot": say what to do in the same sentence)', flush=True)
+        else:
+            print(f"you said: {request}", flush=True)
+            node.send_output("text", pa.array([request]), {"spoken": True})
 
 
 def wait_for_end(recorder):

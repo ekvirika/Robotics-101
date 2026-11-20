@@ -19,7 +19,7 @@ CONVERSATION_MODEL = "mlx-community/whisper-large-v3-turbo"  # hands-free: short
 SAMPLE_RATE = 16000  # Hz, what Whisper expects
 VOCABULARY = (
     "Put the blue bottle on the green mark. Put the red can next to the blue bottle. On table A, on table B. "
-    "Red, yellow, green, blue. Bottle, can, box. Yes, no. Stop."
+    "Robot, put it on table B. Red, yellow, green, blue. Bottle, can, box. Yes, no. Stop."
 )
 TOO_SHORT = 0.3  # s: a tap of the key, not a sentence
 TOO_QUIET = 0.001  # RMS of float audio in -1..1: nothing was said (a headset mic speaking is about 0.004)
@@ -57,6 +57,22 @@ REPETITIVE = 2.4  # gzip compression ratio: above it, a segment repeats itself (
 def believable(segment):
     """A segment Whisper heard, not one it invented from room noise."""
     return segment.get("no_speech_prob", 0.0) < NOT_SPEECH and segment.get("compression_ratio", 1.0) < REPETITIVE
+
+
+def addressed(text, wake="robot"):
+    """The request in `text` if it starts with the wake word ("Robot, put ..." -> "put ..."), else None.
+
+    "Hey robot" and "okay robot" count too. With an empty wake word every sentence is addressed."""
+    if not wake:
+        return text
+    words = re.findall(r"[A-Za-z0-9']+|[^A-Za-z0-9'\s]+", text)
+    letters = [i for i, w in enumerate(words) if re.match(r"[A-Za-z0-9']", w)]
+    lowered = [words[i].lower() for i in letters]
+    for lead in ([wake], ["hey", wake], ["okay", wake], ["ok", wake], [wake + "s"]):
+        if lowered[: len(lead)] == lead:
+            rest = text.split(words[letters[len(lead) - 1]], 1)[1]
+            return rest.lstrip(" ,.!?:;-").strip()
+    return None
 
 
 def has_words(text):
