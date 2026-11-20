@@ -76,7 +76,9 @@ nodes:
     path: ../../.venv/bin/python
     args: -u nodes/dashboard.py
     inputs:
-      base_pose: sim/base_pose
+      base_pose:
+        source: sim/base_pose
+        queue_size: 1 # only the newest pose: it is drawn 10 times a second
       objects: skills/objects
       held: skills/held
       status: skills/status

@@ -44,6 +44,9 @@ def start_rerun():
         os.makedirs("out", exist_ok=True)
         rr.init("tell-the-robot")
         rr.save("out/tell_the_robot.rrd")
+    elif os.environ.get("VIEWER") == "connect":
+        rr.init("tell-the-robot")
+        rr.connect_grpc()  # a viewer already open (run_on_brev.sh starts one)
     else:
         rr.init("tell-the-robot", spawn=True)
     room = rrb.Spatial3DView(name="what the robot remembers", origin="world")

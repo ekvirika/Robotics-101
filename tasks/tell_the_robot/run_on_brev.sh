@@ -51,11 +51,12 @@ on_brev_detached() { ssh "$host" "$(in_container -d) bash -lc '$BREV_ENV; $*'"; 
 stop() {
     echo "stopping: dataflow, daemons, coordinator, tunnel"
     "$dora" destroy --coordinator-port "$COORD" >/dev/null 2>&1 || true
-    on_brev "pkill -f \"dora daemon --machine-id ttr\"; pkill -f \"dora coordinator --port $COORD\"" >/dev/null 2>&1 || true  # only ours
+    on_brev "pkill -f \"[t]asks.tell_the_robot.nodes\"; pkill -f \"[g]1.nodes.sim\"; pkill -f \"[d]ora daemon --machine-id ttr\"; pkill -f \"[d]ora coordinator --port $COORD\"" >/dev/null 2>&1 || true  # only ours; [x] keeps pkill off its own command line
     [[ -n ${daemon:-} ]] && kill "$daemon" 2>/dev/null || true
     [[ -n ${tunnel:-} ]] && kill "$tunnel" 2>/dev/null || true
 }
 trap stop EXIT
+trap "exit 130" INT TERM HUP  # closing the terminal still cleans up
 
 ssh -N -o ExitOnForwardFailure=yes -o ControlMaster=no -o ControlPath=none \
     -L "$COORD:127.0.0.1:$COORD" -L "$PEER_B:127.0.0.1:$PEER_B" -R "$PEER_M:127.0.0.1:$PEER_M" \
@@ -73,6 +74,10 @@ on_brev_detached "cd $BREV_REPO && dora daemon --machine-id ttr --coordinator-ad
 sleep 3
 
 export PATH="$repo/.venv/bin:$PATH"  # the Rerun viewer, for the dashboard
+rerun >/dev/null 2>&1 &  # the dashboard window; the dashboard node connects to it (VIEWER=connect)
+viewer=$!
+export VIEWER=connect
+sleep 2
 set -a
 # shellcheck disable=SC1091
 source "$env_file"
