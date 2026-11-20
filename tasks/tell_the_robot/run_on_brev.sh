@@ -72,6 +72,7 @@ on_brev_detached "cd $BREV_REPO && dora daemon --machine-id ttr --coordinator-ad
     >/tmp/ttr-daemon.log 2>&1"
 sleep 3
 
+export PATH="$repo/.venv/bin:$PATH"  # the Rerun viewer, for the dashboard
 set -a
 # shellcheck disable=SC1091
 source "$env_file"
