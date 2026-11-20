@@ -10,7 +10,7 @@
 # dataflow.yml are made absolute in out/dataflow.run.yml before it starts.
 #
 # Before: `brev login` and `brev refresh` (adds the machine to ~/.ssh/config), the repository
-# installed on the machine (README, Install), and here: .venv with ".[agent,voice]" and a .env
+# installed on the machine (README, Install), and here: .venv with ".[agent,voice,dashboard]" and a .env
 # with the key (agent.py says which variables): next to pyproject.toml, or ENV_FILE=<path>.
 #
 # The SSH connection carries three ports, all on 127.0.0.1 at both ends:

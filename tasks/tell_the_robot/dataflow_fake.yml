@@ -8,10 +8,11 @@
 # sim:    tests/fake_sim_node.py (FakeRoom: exact walking, real arm kinematics, no physics), real time
 # skills: the skills and the memory (nodes/skills.py)
 # agent:  Claude through tools (nodes/agent.py); needs a key in the environment (nodes/agent.py says which)
+# dashboard: Rerun, the memory on a map of the room and the conversation (nodes/dashboard.py)
 # voice:  speaks every reply (macOS say); chat: type or speak, started by hand in a second terminal:
 #           python tasks/tell_the_robot/nodes/chat.py
 #
-# From this folder, with the repository's environment in .venv (pip install -e ".[agent,voice]"; dora 1.1.0
+# From this folder, with the repository's environment in .venv (pip install -e ".[agent,voice,dashboard]"; dora 1.1.0
 # needs a file path, a bare "python" is not looked up):
 #   dora run dataflow_fake.yml
 
@@ -57,6 +58,18 @@ nodes:
     args: -u nodes/voice.py
     inputs:
       reply: agent/reply
+
+  - id: dashboard
+    path: ../../.venv/bin/python
+    args: -u nodes/dashboard.py
+    inputs:
+      base_pose: sim/base_pose
+      objects: skills/objects
+      held: skills/held
+      status: skills/status
+      log: agent/log
+    env:
+      DASHBOARD_LAYOUT: audience # or engineer: adds the memory table and the skill steps
 
   - id: chat
     path: dynamic

@@ -24,6 +24,7 @@ voice = [  # tasks/tell_the_robot: push-to-talk on the computer with the microph
     "mlx-whisper>=0.4; sys_platform == 'darwin'",
     "sounddevice>=0.5",
 ]
+dashboard = ["rerun-sdk>=0.42"]  # tasks/tell_the_robot: what the robot remembers and hears, live
 
 [build-system]
 requires = ["setuptools>=68"]

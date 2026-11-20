@@ -1,5 +1,5 @@
 # Tell the robot, in Isaac Lab: the G1 and the skills on the GPU machine (brev), the language
-# model, the voice and the chat on the computer with the microphone and the key (mac).
+# model, the voice, the chat and the dashboard on the computer with the microphone and the key (mac).
 #
 #   brev:  sim ──base_pose, robot_state, scan, object_pose──▶ skills
 #           ▲                                                   │
@@ -16,7 +16,7 @@
 # coordinator and both daemons, and runs this file from this folder. Paths:
 #   brev  Isaac Lab in /workspace/isaaclab, this repository installed into it (README, Install),
 #         nodes started as modules, so they don't depend on the folder they start in
-#   mac   the repository's .venv (pip install -e ".[agent,voice]"), relative to this folder
+#   mac   the repository's .venv (pip install -e ".[agent,voice,dashboard]"), relative to this folder
 # Watch at <the Brev VS Code link>/viewer/ .
 
 nodes:
@@ -69,6 +69,20 @@ nodes:
     args: -u nodes/voice.py
     inputs:
       reply: agent/reply
+
+  - id: dashboard
+    deploy:
+      machine: mac
+    path: ../../.venv/bin/python
+    args: -u nodes/dashboard.py
+    inputs:
+      base_pose: sim/base_pose
+      objects: skills/objects
+      held: skills/held
+      status: skills/status
+      log: agent/log
+    env:
+      DASHBOARD_LAYOUT: audience # or engineer: adds the memory table and the skill steps
 
   - id: chat
     deploy:
