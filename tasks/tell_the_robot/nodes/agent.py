@@ -83,7 +83,8 @@ def advance():
 
 def hear(text):
     global conductor, thinking, cancelled
-    if text.lower().strip(" .!") in ("stop", "halt"):
+    words = text.lower().replace(",", " ").replace(".", " ").replace("!", " ").split()
+    if words and words[0] in ("stop", "halt"):  # "Stop. Wait..." stops too
         send("command", json.dumps({"skill": "stop"}))
         if conductor is not None:
             brain.give(conductor.stop())
