@@ -6,11 +6,14 @@ Scene names are the objects' names (blue_bottle, red_can, ...), so the sim
 node reports them with OBJECTS=blue_bottle,red_can,... and Perception.find
 finds them by the same name.
 
-It ends when any object falls to the floor (failure), the robot falls
-(failure) or time runs out. Whether a request was done right is for the
+It ends when the robot falls (failure) or time runs out, and in scored runs
+(TTR_END_ON_DROP=1) also when any object falls to the floor; in a conversation a
+fallen object stays where it fell and the room is not reset. Whether a request was done right is for the
 person who asked; scored runs check it (scripts/run_task.py does not run
 this task: it has no fixed mission).
 """
+
+import os
 
 from area import scene
 from g1.isaac import G1TaskEnvCfg, lidar_cfg, robot_cfg
@@ -27,6 +30,9 @@ from .layout import OBJECTS, PLACE_MARK, START, TABLE_A, TABLE_B, TABLE_SIZE
 
 MARK_COLOR = (0.2, 0.8, 0.3)
 MARK_RADIUS = 0.05  # m: the 10 cm green disc of pick and place
+END_ON_DROP = (
+    os.environ.get("TTR_END_ON_DROP", "0") == "1"
+)  # scored runs: a fallen object ends it; talking: the room stays
 SESSION_LENGTH = 3600.0  # s: one sim run is a whole conversation; the episode must outlast it
 FLOOR_LEVEL = 0.3  # m: an object center below this has fallen off the table
 
@@ -118,4 +124,5 @@ class TellTheRobotEnvCfg(G1TaskEnvCfg):
         for thing in OBJECTS:
             setattr(self.scene, thing.name, thing_cfg(thing))
             setattr(self.events, f"reset_{thing.name}", reset_term(thing.name))
-            setattr(self.terminations, f"{thing.name}_dropped", dropped_term(thing.name))
+            if END_ON_DROP:
+                setattr(self.terminations, f"{thing.name}_dropped", dropped_term(thing.name))
