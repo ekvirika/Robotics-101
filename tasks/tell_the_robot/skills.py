@@ -49,6 +49,9 @@ LIFT = 0.10  # m: lift the object this high off the table
 WALK_ABOVE = 0.05  # m: while walking, empty hands wait this far above grasp height
 PLACE_ABOVE = 0.01  # m: let go this far above the table
 STANCE_DEPTH = 0.08  # m: pick and place's stance, an object this far in: the pelvis never goes nearer the edge
+HOLD_GAIN = 1.5  # 1/s: turn command per radian the docked heading is off
+HOLD_TURN = 0.3  # rad/s: the most it turns to hold the heading
+HOLD_DEADBAND = 0.01  # rad: closer than this, no correction (no stepping for nothing)
 LOOK_TIME = 1.0  # s: stand still and look
 STEP_TIMEOUT = 60.0  # s
 MOVED = 0.05  # m: an object this far from where it was remembered has been moved
@@ -138,7 +141,7 @@ class Body:
 
     def _drive(self):
         if self.walking is None:
-            self.robot.move(0.0, 0.0, 0.0)
+            self.robot.move(0.0, 0.0, self._hold_heading())
             return
         pose = self.robot.pose()
         scan = None
@@ -157,6 +160,19 @@ class Body:
                 self.walking = None
                 cmd = (0.0, 0.0, 0.0)
         self.robot.move(*cmd)
+
+    def _hold_heading(self):
+        """Turn command that keeps the docked heading while the arm moves (0 otherwise).
+
+        Standing still, the walking policy lets the body turn as the arm reaches out: 6 degrees
+        during one grasp at table B swept the hand 4 cm sideways and knocked the bottle over."""
+        if self.dock_spot is None or not self.hands.busy():
+            return 0.0
+        error = self.dock_spot[2] - self.robot.pose()[2]
+        error = math.atan2(math.sin(error), math.cos(error))
+        if abs(error) < HOLD_DEADBAND:
+            return 0.0
+        return max(-HOLD_TURN, min(HOLD_TURN, HOLD_GAIN * error))
 
     # ---- where to stand, what the hand reaches ----
 
@@ -440,6 +456,9 @@ class Pick(Skill):
     def _holding(self):
         position, _ = self.robot.find(self.obj.name)
         if position[2] < self.start_position[2] + LIFT / 2:
+            self.memory.look(self.robot)
+            if table_under(position) is None or position[2] < self.start_position[2] - 0.05:
+                return f"my hand closed on nothing and {self.obj.label} fell to the floor; I can't pick from the floor"
             return f"my hand closed on nothing: {self.obj.label} is still on the table"
         self.memory.held = self.obj.name
         self.memory.look(self.robot)
