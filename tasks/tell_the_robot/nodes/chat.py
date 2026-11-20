@@ -11,7 +11,7 @@ text on this Mac (tasks/tell_the_robot/voice.py) and the text goes to the robot 
 By default it listens hands-free: speak, pause 1.6 s (CHAT_PAUSE), and the sentence goes; never while the robot talks
 (CHAT_HANDS_FREE=0 goes back to Enter first). CHAT_VOICE=0 turns speaking off,
 CHAT_AUTO_STOP=0 waits for Enter only, WHISPER_MODEL picks the model, CHAT_MIC the
-microphone by part of its name (default: the MacBook's own, not a headset).
+microphone by part of its name (default: the ACCENTUM headset, which hears the speaker, not the room).
 
 Type or say "stop" to stop the robot at once. Ctrl-D or Ctrl-C to leave (the robot keeps running).
 """

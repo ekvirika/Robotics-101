@@ -27,7 +27,7 @@ PAUSE = 1.0  # s of quiet after speech: the sentence is over, recording stops by
 SPEECH = 0.01  # RMS: louder than this, and 3x the room's floor, is speech
 HEADSET_SPEECH = 0.002  # the same for a headset mic, which records about 5x quieter (ACCENTUM: 0.004 speaking)
 LONGEST = 15.0  # s: a recording stops here even without a pause
-MIC = "MacBook"  # the built-in mic; a Bluetooth headset may be the default input and is quiet
+MIC = "ACCENTUM"  # the headset: it hears the speaker, not the room; missing -> the default input
 
 
 def transcribe(audio, model=MODEL):
