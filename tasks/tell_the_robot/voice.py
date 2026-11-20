@@ -121,6 +121,11 @@ class Recorder:
         chunks = list(self.chunks)
         return np.concatenate(chunks).ravel() if chunks else np.zeros(0, np.float32)
 
+    def keep_last(self, seconds):
+        """Drop all but the last `seconds` of what was recorded, and keep recording."""
+        audio = self.audio()[-int(seconds * SAMPLE_RATE) :]
+        self.chunks = [audio.reshape(-1, 1)] if len(audio) else []
+
     def stop(self):
         if self.stream is None:
             return np.zeros(0, np.float32)

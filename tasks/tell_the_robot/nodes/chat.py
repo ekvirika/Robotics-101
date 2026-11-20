@@ -33,7 +33,8 @@ MODEL = os.environ.get("WHISPER_MODEL", voice.MODEL)
 MIC = os.environ.get("CHAT_MIC", voice.MIC)
 AUTO_STOP = os.environ.get("CHAT_AUTO_STOP", "1") != "0"
 HANDS_FREE = SPEAKING and os.environ.get("CHAT_HANDS_FREE", "1") != "0"
-QUIET_RESTART = 10.0  # s: no speech this long, start a fresh recording (the floor stays current)
+QUIET_RESTART = 10.0  # s: no speech this long, drop all but the last PRE_ROLL (the floor stays current)
+PRE_ROLL = 1.0  # s kept across that drop: the first word of a sentence starting right then
 
 node = Node("chat")
 
@@ -60,11 +61,11 @@ def hear_one(recorder):
                 return recorder.stop()
             spoke = voice.speech_started(audio)
             waited = time.monotonic() - start
-            if (not spoke and waited > QUIET_RESTART) or waited > QUIET_RESTART + voice.LONGEST:
-                audio = recorder.stop()
-                if spoke:
-                    return audio
-                break
+            if not spoke and waited > QUIET_RESTART:
+                recorder.keep_last(PRE_ROLL)  # a fresh floor, without losing a sentence starting now
+                start = time.monotonic()
+            elif waited > QUIET_RESTART + voice.LONGEST:
+                return recorder.stop()
 
 
 def listen_hands_free():
