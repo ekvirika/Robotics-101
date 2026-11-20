@@ -23,10 +23,11 @@ from isaaclab.managers import SceneEntityCfg
 from isaaclab.managers import TerminationTermCfg as DoneTerm
 from isaaclab.utils.configclass import configclass
 
-from .layout import OBJECTS, PLACE_MARK, START, TABLE_A, TABLE_B, TABLE_SIZE, TIME_LIMIT
+from .layout import OBJECTS, PLACE_MARK, START, TABLE_A, TABLE_B, TABLE_SIZE
 
 MARK_COLOR = (0.2, 0.8, 0.3)
 MARK_RADIUS = 0.05  # m: the 10 cm green disc of pick and place
+SESSION_LENGTH = 3600.0  # s: one sim run is a whole conversation; the episode must outlast it
 FLOOR_LEVEL = 0.3  # m: an object center below this has fallen off the table
 
 COLORS = {
@@ -102,7 +103,7 @@ class TellTheRobotEnvCfg(G1TaskEnvCfg):
 
     def __post_init__(self):
         super().__post_init__()
-        self.episode_length_s = TIME_LIMIT
+        self.episode_length_s = SESSION_LENGTH  # a conversation, not one timed request (TIME_LIMIT)
         self.scene.robot = robot_cfg(START)
         self.scene.ground = scene.ground()
         self.scene.sky = scene.sky()
