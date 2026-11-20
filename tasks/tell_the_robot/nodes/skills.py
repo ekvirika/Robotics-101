@@ -53,6 +53,7 @@ def report_memory():
 
 
 def finish(name, ok, message):
+    robot.node.log_info(f"{name} {'OK' if ok else 'FAILED'}: {message}")
     send("result", json.dumps({"skill": name, "ok": ok, "message": message}))
     report_memory()
 
@@ -112,6 +113,7 @@ while True:
         if skill.label != label:
             label = skill.label
             send("status", f"{skill.name}: {label}")
+            robot.node.log_info(f"{skill.name}: {label}  (robot at {tuple(round(v, 2) for v in robot.pose())})")
         if skill.done:
             finish(skill.name, skill.result.ok, skill.result.message)
             skill, label = None, ""
