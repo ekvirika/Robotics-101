@@ -38,6 +38,7 @@ QUIET_RESTART = 10.0  # s: no speech this long, drop all but the last PRE_ROLL (
 PAUSE = float(os.environ.get("CHAT_PAUSE", "1.6"))  # s of quiet that ends a hands-free sentence: room to think
 ECHO = 0.5  # s after the robot stops talking before listening: the room still rings with its voice
 WAKE = os.environ.get("CHAT_WAKE", "robot").lower()  # hands-free: only "Robot, ..." is sent; "" sends all
+ENTER_LONGEST = 60.0  # s: with Enter to stop (CHAT_AUTO_STOP=0), room to think while talking
 PRE_ROLL = 1.0  # s kept across that drop: the first word of a sentence starting right then
 
 node = Node("chat")
@@ -114,8 +115,9 @@ def wait_for_end(recorder):
             return "Enter"
         if AUTO_STOP and voice.speech_ended(recorder.audio()):
             return "you paused"
-        if time.monotonic() - start > voice.LONGEST:
-            return f"{voice.LONGEST:.0f} s"
+        longest = voice.LONGEST if AUTO_STOP else ENTER_LONGEST
+        if time.monotonic() - start > longest:
+            return f"{longest:.0f} s"
 
 
 def read_keyboard():
