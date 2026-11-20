@@ -6,7 +6,8 @@ Robot skills run one at a time: a command goes to skills, the next waits for
 its result.
 
 "stop" (or "halt") never reaches the model: it goes straight to skills, which
-stops walking and the arm at once, and the current request is dropped.
+stops walking and the arm at once, and the current request is dropped. Any other
+sentence while the robot is busy does the same and then becomes the new request.
 
 Inputs:  text      a sentence from a person (chat node, or AGENT_SCRIPT)
          result    JSON text from skills when a skill ends
@@ -40,6 +41,7 @@ worker = ThreadPoolExecutor(max_workers=1)
 thinking = None  # Future of agent.think()
 conductor = None  # the calls of the current turn
 cancelled = False  # a stop came while thinking: the answer is closed, not run
+waiting = None  # a request that came while the model was still answering the one it replaces
 objects, held = [], None
 said = os.environ.get("ROBOT_SAY") or os.environ.get("AGENT_SCRIPT", "")  # ROBOT_SAY from the shell wins
 script = [s.strip() for s in said.split("|") if s.strip()]
@@ -81,21 +83,32 @@ def advance():
         start_thinking()
 
 
+def interrupt():
+    """Stop the robot and close the current request, so the model's history stays valid."""
+    global conductor, cancelled
+    send("command", json.dumps({"skill": "stop"}))
+    if conductor is not None:
+        brain.give(conductor.stop())
+    cancelled = thinking is not None  # the turn on its way: its calls are closed as stopped on arrival
+    conductor = None
+
+
 def hear(text):
-    global conductor, thinking, cancelled
+    global waiting
     words = text.lower().replace(",", " ").replace(".", " ").replace("!", " ").split()
     if words and words[0] in ("stop", "halt"):  # "Stop. Wait..." stops too
-        send("command", json.dumps({"skill": "stop"}))
-        if conductor is not None:
-            brain.give(conductor.stop())
-        cancelled = thinking is not None  # the turn on its way: its calls are closed as stopped on arrival
-        conductor = None
+        interrupt()
+        waiting = None
         send("reply", "Stopped.")
         log("heard stop: robot stopped")
         return
-    if not idle():
-        send("reply", "I'm still busy with the last request. Say stop to stop it.")
-        return
+    if not idle():  # a new request replaces the one running, as when a person changes their mind
+        interrupt()
+        log(f"new request, the last one is dropped: {text}")
+        if thinking is not None:  # the model is still answering the old one: hear this once it is closed
+            waiting = text
+            send("reply", "Okay, changing plans.")
+            return
     log(f"heard: {text}")
     if NARRATE:
         send("reply", "Okay.")
@@ -136,6 +149,9 @@ for event in node:
                 cancelled = False
                 if not turn.done:
                     brain.give(agent.Conductor(turn).stop())
+                if waiting:
+                    text, waiting = waiting, None
+                    hear(text)
                 continue
             if turn.done:
                 send("reply", turn.text)
