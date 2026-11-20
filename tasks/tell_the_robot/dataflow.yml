@@ -22,7 +22,7 @@
 nodes:
   - id: sim
     deploy:
-      machine: brev
+      machine: ttr
     path: /workspace/isaaclab/isaaclab.sh
     args: -p -m g1.nodes.sim --livestream 2 --viz kit # or --headless: no picture
     inputs:
@@ -36,7 +36,7 @@ nodes:
 
   - id: skills
     deploy:
-      machine: brev
+      machine: ttr
     path: /workspace/isaaclab/isaaclab.sh
     args: -p -u -m tasks.tell_the_robot.nodes.skills
     inputs:
