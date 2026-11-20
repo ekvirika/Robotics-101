@@ -77,6 +77,21 @@ def speech_ended(audio, rate=SAMPLE_RATE, pause=PAUSE):
     return bool(loud[:-tail].any() and not loud[-tail:].any())
 
 
+def speech_started(audio, rate=SAMPLE_RATE):
+    """Someone spoke somewhere in `audio` (same loudness rule as speech_ended)."""
+    window = rate // 10
+    count = len(audio) // window
+    if count < 3:
+        return False
+    levels = np.sqrt(np.mean(np.asarray(audio[: count * window], np.float32).reshape(count, window) ** 2, axis=1))
+    return bool((levels > max(SPEECH, 3 * float(np.percentile(levels, 10)))).any())
+
+
+def robot_speaking():
+    """macOS `say` is talking: what the microphone hears now is the robot, not a person."""
+    return subprocess.run(["pgrep", "-x", "say"], capture_output=True).returncode == 0
+
+
 def level(audio):
     """RMS of float audio: 0 is silence, speech close to a laptop mic is about 0.02 to 0.1."""
     return float(np.sqrt(np.mean(audio**2))) if len(audio) else 0.0

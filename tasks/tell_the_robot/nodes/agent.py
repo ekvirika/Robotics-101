@@ -17,6 +17,8 @@ Outputs: command   JSON text, one skill, to skills
          reply     what the robot says, to chat and dashboard
          log       one line per event (heard, tool call, result, reply), for the dashboard
 
+Each skill is announced as it starts ("Looking around for the blue bottle."), and "Okay." when a
+sentence is heard; AGENT_NARRATE=0 keeps it to the final reply.
 AGENT_SCRIPT (agent.yml) or ROBOT_SAY (shell, wins): sentences separated by "|", sent one after
 another when the robot is idle
 (automatic runs without typing). Needs a key in the environment: ANTHROPIC_API_KEY, or through a proxy
@@ -40,6 +42,7 @@ conductor = None  # the calls of the current turn
 objects, held = [], None
 said = os.environ.get("ROBOT_SAY") or os.environ.get("AGENT_SCRIPT", "")  # ROBOT_SAY from the shell wins
 script = [s.strip() for s in said.split("|") if s.strip()]
+NARRATE = os.environ.get("AGENT_NARRATE", "1") != "0"  # say each step as it starts: "Picking up the blue bottle."
 node = Node()
 
 
@@ -68,6 +71,8 @@ def advance():
     if call is not None:
         log(f"-> {call.name}({json.dumps(call.input)})")
         send("command", json.dumps(agent.skill_command(call)))
+        if NARRATE:
+            send("reply", agent.narration(call, objects))
         return
     if conductor.done:
         brain.give(conductor.results)
@@ -87,6 +92,8 @@ def hear(text):
         send("reply", "I'm still busy with the last request. Say stop to stop it.")
         return
     log(f"heard: {text}")
+    if NARRATE:
+        send("reply", "Okay.")
     brain.hear(text)
     start_thinking()
 

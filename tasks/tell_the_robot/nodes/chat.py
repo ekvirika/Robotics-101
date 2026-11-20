@@ -8,7 +8,9 @@ second terminal on the computer with the microphone:
 Typing: a sentence, then Enter. Speaking: Enter on an
 empty line starts the microphone; it stops after a 1 s pause, after 15 s, or on Enter; Whisper turns it into
 text on this Mac (tasks/tell_the_robot/voice.py) and the text goes to the robot as if typed.
-CHAT_VOICE=0 turns speaking off, CHAT_AUTO_STOP=0 waits for Enter only, WHISPER_MODEL picks the model, CHAT_MIC the
+By default it listens hands-free: speak, pause 1 s, and the sentence goes; never while the robot talks
+(CHAT_HANDS_FREE=0 goes back to Enter first). CHAT_VOICE=0 turns speaking off,
+CHAT_AUTO_STOP=0 waits for Enter only, WHISPER_MODEL picks the model, CHAT_MIC the
 microphone by part of its name (default: the MacBook's own, not a headset).
 
 Type or say "stop" to stop the robot at once. Ctrl-D or Ctrl-C to leave (the robot keeps running).
@@ -30,6 +32,8 @@ SPEAKING = os.environ.get("CHAT_VOICE", "1") != "0"
 MODEL = os.environ.get("WHISPER_MODEL", voice.MODEL)
 MIC = os.environ.get("CHAT_MIC", voice.MIC)
 AUTO_STOP = os.environ.get("CHAT_AUTO_STOP", "1") != "0"
+HANDS_FREE = SPEAKING and os.environ.get("CHAT_HANDS_FREE", "1") != "0"
+QUIET_RESTART = 10.0  # s: no speech this long, start a fresh recording (the floor stays current)
 
 node = Node("chat")
 
@@ -37,6 +41,46 @@ node = Node("chat")
 def warm_up():
     """Load Whisper now, so the first spoken sentence isn't slow."""
     voice.transcribe(np.full(voice.SAMPLE_RATE, 0.01, np.float32), MODEL)
+
+
+def hear_one(recorder):
+    """Hands-free: the next sentence a person says, as audio. Never while the robot talks."""
+    while True:
+        while voice.robot_speaking():
+            time.sleep(0.2)
+        recorder.start()
+        start = time.monotonic()
+        while True:
+            time.sleep(0.1)
+            if voice.robot_speaking():
+                recorder.stop()
+                break
+            audio = recorder.audio()
+            if voice.speech_ended(audio):
+                return recorder.stop()
+            spoke = voice.speech_started(audio)
+            waited = time.monotonic() - start
+            if (not spoke and waited > QUIET_RESTART) or waited > QUIET_RESTART + voice.LONGEST:
+                audio = recorder.stop()
+                if spoke:
+                    return audio
+                break
+
+
+def listen_hands_free():
+    device, mic = voice.microphone(MIC)
+    print(f"microphone: {mic}. Just speak; the sentence is sent after a 1 s pause.", flush=True)
+    recorder = voice.Recorder(device)
+    while True:
+        try:
+            audio = hear_one(recorder)
+        except Exception as error:
+            print(f"(microphone failed: {error})", flush=True)
+            return
+        heard = voice.transcribe(audio, MODEL)
+        if heard:
+            print(f"you said: {heard}", flush=True)
+            node.send_output("text", pa.array([heard]), {"spoken": True})
 
 
 def wait_for_end(recorder):
@@ -91,6 +135,9 @@ def read_keyboard():
 
 if SPEAKING:
     threading.Thread(target=warm_up, daemon=True).start()
+if HANDS_FREE:
+    threading.Thread(target=listen_hands_free, daemon=True).start()
+    SPEAKING = False  # the keyboard is for typing only; the microphone is already listening
 threading.Thread(target=read_keyboard, daemon=True).start()
 hint = ", or press Enter and speak (click this terminal first)" if SPEAKING else ""
 print(f'Type a sentence{hint}. "stop" stops the robot.', flush=True)

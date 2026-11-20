@@ -196,6 +196,27 @@ def skill_command(call):
     raise ValueError(f"{call.name} is not a robot skill")
 
 
+PLACE_WORDS = {"table_a": "table A", "table_b": "table B", "mark": "the green mark", "start": "the start"}
+
+
+def narration(call, objects):
+    """What the robot says as a skill starts, from the tool call and the memory (no model call)."""
+    names = {o["id"]: f"the {o['color']} {o['kind']}" for o in objects}
+    if call.name == "look_around":
+        find = call.input.get("find", "")
+        return f"Looking around for the {find}." if find else "Looking around."
+    if call.name == "go_to":
+        return f"Walking to {PLACE_WORDS.get(call.input['place'], call.input['place'])}."
+    if call.name == "pick":
+        return f"Picking up {names.get(call.input['object_id'], 'it')}."
+    if call.name == "place":
+        target = call.input["target"]
+        if target == "next_to":
+            return f"Putting it next to {names.get(call.input.get('next_to_id'), 'it')}."
+        return f"Putting it on {PLACE_WORDS.get(target, target)}."
+    return ""
+
+
 class Agent:
     def __init__(self, client, model=MODEL, effort=EFFORT, fallbacks=FALLBACKS):
         self.client = client
