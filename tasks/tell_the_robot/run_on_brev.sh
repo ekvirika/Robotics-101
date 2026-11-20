@@ -49,6 +49,7 @@ on_brev() { ssh "$host" "$(in_container -i) bash -lc '$BREV_ENV; $*'"; }
 on_brev_detached() { ssh "$host" "$(in_container -d) bash -lc '$BREV_ENV; $*'"; }
 
 stop() {
+    trap '' INT TERM HUP  # a second Ctrl-C must not cut the cleanup short
     echo "stopping: dataflow, daemons, coordinator, tunnel"
     "$dora" destroy --coordinator-port "$COORD" >/dev/null 2>&1 || true
     on_brev "pkill -f \"[t]asks.tell_the_robot.nodes\"; pkill -f \"[g]1.nodes.sim\"; pkill -f \"[d]ora daemon --machine-id ttr\"; pkill -f \"[d]ora coordinator --port $COORD\"" >/dev/null 2>&1 || true  # only ours; [x] keeps pkill off its own command line
